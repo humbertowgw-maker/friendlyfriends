@@ -206,6 +206,50 @@ export async function initDb() {
       FOREIGN KEY (first_requested_from) REFERENCES book_references(id) ON DELETE SET NULL,
       UNIQUE(character_id, asset_type, requested_label)
     );
+
+    CREATE TABLE IF NOT EXISTS episodes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      description TEXT,
+      status TEXT DEFAULT 'draft',
+      approval_status TEXT DEFAULT 'pending',
+      approved_by TEXT,
+      approved_at DATETIME,
+      metadata TEXT DEFAULT '{}',
+      created_at DATETIME DEFAULT (datetime('now')),
+      updated_at DATETIME DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS scenes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      episode_id INTEGER NOT NULL,
+      scene_order INTEGER NOT NULL DEFAULT 0,
+      title TEXT,
+      narration TEXT,
+      background_scene TEXT DEFAULT 'indoor_general',
+      dialogue TEXT DEFAULT '[]',
+      actions TEXT DEFAULT '[]',
+      image_asset_ref TEXT,
+      audio_asset_ref TEXT,
+      video_asset_ref TEXT,
+      status TEXT DEFAULT 'pending',
+      metadata TEXT DEFAULT '{}',
+      created_at DATETIME DEFAULT (datetime('now')),
+      FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS episode_approvals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      episode_id INTEGER NOT NULL,
+      stage TEXT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      notes TEXT,
+      reviewer TEXT,
+      reviewed_at DATETIME,
+      created_at DATETIME DEFAULT (datetime('now')),
+      FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE
+    );
   `);
 
   return db;

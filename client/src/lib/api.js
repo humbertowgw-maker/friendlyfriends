@@ -166,3 +166,117 @@ export async function fetchGeneratorStatus() {
   const res = await fetch(`${API_BASE}/inventory/generators/status`);
   return res.json();
 }
+
+// --- Episodes API ---
+
+export async function fetchEpisodes() {
+  const res = await fetch(`${API_BASE}/episodes`);
+  return res.json();
+}
+
+export async function fetchEpisode(id) {
+  const res = await fetch(`${API_BASE}/episodes/${id}`);
+  return res.json();
+}
+
+export async function createEpisode(data) {
+  const res = await fetch(`${API_BASE}/episodes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function updateEpisode(id, data) {
+  const res = await fetch(`${API_BASE}/episodes/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function deleteEpisode(id) {
+  const res = await fetch(`${API_BASE}/episodes/${id}`, { method: 'DELETE' });
+  return res.json();
+}
+
+export async function addScene(episodeId, data) {
+  const res = await fetch(`${API_BASE}/episodes/${episodeId}/scenes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function updateScene(sceneId, data) {
+  const res = await fetch(`${API_BASE}/episodes/scenes/${sceneId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function deleteScene(sceneId) {
+  const res = await fetch(`${API_BASE}/episodes/scenes/${sceneId}`, { method: 'DELETE' });
+  return res.json();
+}
+
+export async function approveEpisodeStage(episodeId, stage, reviewer, notes) {
+  const res = await fetch(`${API_BASE}/episodes/${episodeId}/approve/${stage}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reviewer, notes }),
+  });
+  return res.json();
+}
+
+export async function rejectEpisodeStage(episodeId, stage, reviewer, notes) {
+  const res = await fetch(`${API_BASE}/episodes/${episodeId}/reject/${stage}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reviewer, notes }),
+  });
+  return res.json();
+}
+
+export async function generateEpisodeAssets(episodeId) {
+  const res = await fetch(`${API_BASE}/episodes/${episodeId}/generate-assets`, { method: 'POST' });
+  return res.json();
+}
+
+export async function generateSceneBackground(sceneId) {
+  const res = await fetch(`${API_BASE}/episodes/scenes/${sceneId}/generate-background`, { method: 'POST' });
+  return res.json();
+}
+
+export async function generateSceneAudio(sceneId) {
+  const res = await fetch(`${API_BASE}/episodes/scenes/${sceneId}/generate-audio`, { method: 'POST' });
+  return res.json();
+}
+
+export async function assembleSceneVideo(sceneId, duration) {
+  const res = await fetch(`${API_BASE}/episodes/scenes/${sceneId}/assemble-video`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ duration }),
+  });
+  return res.json();
+}
+
+export async function fullBuildEpisode(episodeId, sceneDuration = 5) {
+  const res = await fetch(`${API_BASE}/episodes/${episodeId}/full-build`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scene_duration: sceneDuration }),
+  });
+  return res.json();
+}
+
+export async function fetchEpisodePipelineStatus() {
+  const res = await fetch(`${API_BASE}/episodes/pipeline/status`);
+  return res.json();
+}

@@ -10,6 +10,8 @@ import { SmartRouter } from './smart-router.js';
 import { createInventoryRoutes } from './inventory/inventory-routes.js';
 import { CharacterInventory } from './inventory/character-inventory.js';
 import { createGenerators } from './generators/index.js';
+import { EdgeTTSAdapter } from './generators/edge-tts-adapter.js';
+import { createEpisodeRoutes } from './inventory/episode-routes.js';
 
 const app = express();
 const server = createServer(app);
@@ -65,9 +67,11 @@ for (const char of CHARACTERS) {
 
 // --- Generators ---
 const generators = createGenerators();
+const tts = new EdgeTTSAdapter();
 
-// --- Inventory routes ---
+// --- Routes ---
 app.use('/api/inventory', createInventoryRoutes(db, generators));
+app.use('/api/episodes', createEpisodeRoutes(db, generators, tts));
 
 // --- Provider routes ---
 app.get('/api/providers', (req, res) => {
