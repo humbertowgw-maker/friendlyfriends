@@ -13,6 +13,8 @@ import {
   fetchGeneratorStatus,
   createCharacter,
   updateCharacter,
+  fetchPoseOptions,
+  generatePose,
 } from '../lib/api.js';
 
 export function InventoryPanel() {
@@ -32,6 +34,10 @@ export function InventoryPanel() {
   const [showCharForm, setShowCharForm] = useState(false);
   const [editingChar, setEditingChar] = useState(null);
   const [charForm, setCharForm] = useState({ name: '', slug: '', description: '' });
+  const [poseOptions, setPoseOptions] = useState(null);
+  const [poseForm, setPoseForm] = useState({ character_slug: 'achilles', action_label: 'sitting', background: '' });
+  const [poseResult, setPoseResult] = useState(null);
+  const [poseLoading, setPoseLoading] = useState(false);
 
   useEffect(() => {
     loadOverview();
@@ -131,17 +137,42 @@ export function InventoryPanel() {
     setShowCharForm(true);
   };
 
+  const loadPoseOptions = async () => {
+    if (!poseOptions) {
+      const opts = await fetchPoseOptions();
+      setPoseOptions(opts);
+    }
+  };
+
+  const handleGeneratePose = async () => {
+    setPoseLoading(true);
+    setPoseResult(null);
+    try {
+      const result = await generatePose({
+        character_slug: poseForm.character_slug,
+        action_label: poseForm.action_label,
+        background: poseForm.background || undefined,
+        register_as_asset: true,
+      });
+      setPoseResult(result);
+      setStats(await fetchInventoryStats());
+    } catch (e) {
+      setPoseResult({ error: e.message });
+    }
+    setPoseLoading(false);
+  };
+
   const pendingGaps = gaps.filter(g => g.status === 'pending');
   const typeIcons = { pose: 'P', movement_cycle: 'M', expression: 'E', voice_line: 'V', background_interaction: 'B' };
 
   return (
     <div>
       <div style={styles.tabBar}>
-        {['overview', 'characters', 'gaps', 'ingest', 'pipeline'].map(t => (
+        {['overview', 'characters', 'generate', 'gaps', 'ingest', 'pipeline'].map(t => (
           <button
             key={t}
             style={{ ...styles.tabBtn, ...(tab === t ? styles.tabBtnActive : {}) }}
-            onClick={() => setTab(t)}
+            onClick={() => { setTab(t); if (t === 'generate') loadPoseOptions(); }}
           >
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -284,6 +315,72 @@ export function InventoryPanel() {
             )}
           </div>
         </div>
+        </div>
+      )}
+
+      {tab === 'generate' && (
+        <div>
+          {poseOptions ? (
+            <div style={styles.card}>
+              <h4 style={styles.cardTitle}>Generate Character Pose</h4>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                <div>
+                  <label style={styles.dim}>Character</label>
+                  <select style={styles.select} value={poseForm.character_slug} onChange={e => setPoseForm({ ...poseForm, character_slug: e.target.value })}>
+                    {poseOptions.characters.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.dim}>Pose</label>
+                  <select style={styles.select} value={poseForm.action_label} onChange={e => setPoseForm({ ...poseForm, action_label: e.target.value })}>
+                    {poseOptions.poses.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={styles.dim}>Background (optional)</label>
+                  <select style={styles.select} value={poseForm.background} onChange={e => setPoseForm({ ...poseForm, background: e.target.value })}>
+                    <option value="">None (character only)</option>
+                    {poseOptions.backgrounds.map(b => <option key={b} value={b}>{b.replace(/_/g, ' ')}</option>)}
+                  </select>
+                </div>
+              </div>
+              <button
+                style={{ ...styles.primaryBtn, opacity: poseLoading ? 0.5 : 1 }}
+                onClick={handleGeneratePose}
+                disabled={poseLoading}
+              >
+                {poseLoading ? 'Generating...' : 'Generate'}
+              </button>
+              {poseResult && (
+                <div style={{ marginTop: 16 }}>
+                  {poseResult.error ? (
+                    <p style={{ color: '#ef4444', fontSize: 12 }}>{poseResult.error}</p>
+                  ) : (
+                    <div>
+                      <div style={styles.dim}>
+                        Generated with <strong>{poseResult.generator}</strong>
+                        {poseResult.asset && <span> — registered as asset</span>}
+                      </div>
+                      {poseResult.asset_ref && (
+                        <img
+                          src={`/assets/${poseResult.asset_ref}`}
+                          alt={poseResult.asset_ref}
+                          style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 8, marginTop: 8, border: '1px solid #2a2a3a' }}
+                        />
+                      )}
+                      {poseResult.metadata?.prompt && (
+                        <div style={{ marginTop: 8, padding: 10, background: '#1a1a25', borderRadius: 6, fontSize: 11, color: '#8888a0', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                          {poseResult.metadata.prompt}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p style={styles.dim}>Loading pose options...</p>
+          )}
         </div>
       )}
 

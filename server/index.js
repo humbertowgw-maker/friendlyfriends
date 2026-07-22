@@ -12,12 +12,19 @@ import { CharacterInventory } from './inventory/character-inventory.js';
 import { createGenerators } from './generators/index.js';
 import { EdgeTTSAdapter } from './generators/edge-tts-adapter.js';
 import { createEpisodeRoutes } from './inventory/episode-routes.js';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const server = createServer(app);
 
 app.use(cors());
 app.use(express.json());
+
+// Serve generated assets (images, audio, video)
+app.use('/assets', express.static(join(__dirname, 'data', 'assets')));
 
 // --- SSE clients ---
 const sseClients = new Set();

@@ -3,6 +3,7 @@ import { CharacterInventory } from './character-inventory.js';
 import { PipelineHook } from './pipeline-hook.js';
 import { BookIngestion } from './book-ingestion.js';
 import { VideoPipeline } from './video-pipeline.js';
+import { PromptBuilder } from '../generators/prompt-builder.js';
 
 export function createInventoryRoutes(db, generators) {
   const router = Router();
@@ -208,6 +209,61 @@ export function createInventoryRoutes(db, generators) {
         : async (slug, label, type) => await VideoPipeline.stubGenerator(label, type)();
       const result = await videoPipeline.processEpisode({ title: title || 'Untitled Episode', scenes }, generateFn);
       res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // --- Pose generation ---
+
+  router.get('/poses', (req, res) => {
+    try {
+      const poses = PromptBuilder.getActionPoses();
+      const backgrounds = PromptBuilder.getBackgroundScenes();
+      const characters = PromptBuilder.getCharacterSlugs();
+      res.json({ poses, backgrounds, characters });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/generate-pose', async (req, res) => {
+    try {
+      const { character_slug, action_label, background, register_as_asset } = req.body;
+      if (!character_slug || !action_label) {
+        return res.status(400).json({ error: 'character_slug and action_label are required' });
+      }
+      if (!generators) {
+        return res.status(500).json({ error: 'No generators configured' });
+      }
+
+      const prompt = background
+        ? PromptBuilder.buildScenePrompt(character_slug, action_label, background)
+        : PromptBuilder.buildPosePrompt(character_slug, action_label);
+
+      const result = await generators.generate({
+        character_slug,
+        action_label,
+        asset_type: background ? 'scene' : 'pose',
+        prompt,
+      });
+
+      let asset = null;
+      if (register_as_asset) {
+        const character = inventory.getCharacterBySlug(character_slug);
+        if (character) {
+          const label = background ? `${action_label} in ${background}` : action_label;
+          asset = inventory.createAsset(character.id, {
+            type: background ? 'scene' : 'pose',
+            label,
+            asset_ref: result.asset_ref,
+            metadata: result.metadata,
+            source: 'generated',
+          });
+        }
+      }
+
+      res.json({ ...result, asset });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
