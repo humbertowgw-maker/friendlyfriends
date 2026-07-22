@@ -10,6 +10,7 @@ import {
   ignoreGap,
   generateScene,
   registerAsset,
+  fetchGeneratorStatus,
 } from '../lib/api.js';
 
 export function InventoryPanel() {
@@ -25,6 +26,7 @@ export function InventoryPanel() {
   const [sceneText, setSceneText] = useState('');
   const [sceneResult, setSceneResult] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [generators, setGenerators] = useState(null);
 
   useEffect(() => {
     loadOverview();
@@ -33,14 +35,16 @@ export function InventoryPanel() {
   const loadOverview = async () => {
     setLoading(true);
     try {
-      const [s, c, g] = await Promise.all([
+      const [s, c, g, gen] = await Promise.all([
         fetchInventoryStats(),
         fetchInventoryCharacters(),
         fetchInventoryGaps(),
+        fetchGeneratorStatus(),
       ]);
       setStats(s);
       setCharacters(c);
       setGaps(g);
+      setGenerators(gen);
     } catch {}
     setLoading(false);
   };
@@ -141,6 +145,34 @@ export function InventoryPanel() {
                   <span style={styles.breakdownCount}>{t.count}</span>
                 </div>
               ))}
+            </div>
+          )}
+          {generators && generators.configured && (
+            <div style={styles.card}>
+              <h4 style={styles.cardTitle}>Generators</h4>
+              {generators.adapters.map(a => (
+                <div key={a.name} style={styles.breakdownRow}>
+                  <span style={styles.breakdownType}>{a.name}</span>
+                  <span style={{ color: a.status === 'online' ? '#4ade80' : a.status === 'configured' ? '#eab308' : '#8888a0', fontSize: 11 }}>
+                    {a.status}{a.mode ? ` (${a.mode})` : ''}
+                  </span>
+                </div>
+              ))}
+              {generators.stats.total > 0 && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#8888a0' }}>
+                  {generators.stats.total} generated
+                  {Object.entries(generators.stats.by_generator).map(([name, count]) => (
+                    <span key={name}> | {name}: {count}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {generators && !generators.configured && (
+            <div style={styles.card}>
+              <h4 style={styles.cardTitle}>Generators</h4>
+              <p style={styles.dim}>No generators configured. Add SD_WEBUI_URL, COMFYUI_URL, or HF_API_TOKEN to .env</p>
+              <p style={styles.dim}>Pollinations.ai is always available as a free fallback.</p>
             </div>
           )}
         </div>

@@ -6,8 +6,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ASSETS_DIR = join(__dirname, '..', 'data', 'assets');
 
 export class VideoPipeline {
-  constructor(inventory) {
+  constructor(inventory, generators) {
     this.inventory = inventory;
+    this.generators = generators || null;
     this.hook = null;
     try { mkdirSync(ASSETS_DIR, { recursive: true }); } catch {}
   }
@@ -22,7 +23,7 @@ export class VideoPipeline {
    * generates only what's missing, and saves everything back.
    *
    * @param {object} scene - { title, actions: [{ character_slug, action_label, asset_type }] }
-   * @param {Function} generateFn - async (characterId, label, type) => { asset_ref, metadata }
+   * @param {Function} generateFn - async (slug, label, type) => { asset_ref, metadata }
    * @returns {object} - { assets: [...], reused: number, generated: number, gaps: [...] }
    */
   async generateScene(scene, generateFn) {
@@ -45,7 +46,17 @@ export class VideoPipeline {
       } else {
         let generated;
         try {
-          generated = await generateFn(character.id, action.action_label, assetType);
+          if (generateFn) {
+            generated = await generateFn(action.character_slug, action.action_label, assetType);
+          } else if (this.generators) {
+            generated = await this.generators.generate({
+              character_slug: action.character_slug,
+              action_label: action.action_label,
+              asset_type: assetType,
+            });
+          } else {
+            generated = await VideoPipeline.stubGenerator(action.action_label, assetType)();
+          }
         } catch (e) {
           results.gaps.push({ error: e.message, action, character_id: character.id });
           this.inventory.createGap(character.id, action.action_label, assetType);
@@ -56,7 +67,7 @@ export class VideoPipeline {
           type: assetType,
           label: action.action_label,
           asset_ref: generated.asset_ref,
-          metadata: generated.metadata || {},
+          metadata: { ...(generated.metadata || {}), generator: generated.generator || 'stub' },
           source: 'generated',
         });
 
@@ -105,7 +116,7 @@ export class VideoPipeline {
 
   /**
    * Stub generator — creates placeholder asset files.
-   * Replace with real generation service (ComfyUI, Runway, etc.)
+   * Used as fallback when no real generators are available.
    */
   static stubGenerator(label, type) {
     return async () => {
@@ -119,6 +130,7 @@ export class VideoPipeline {
           generated_by: 'video-pipeline-stub',
           generated_at: new Date().toISOString(),
         },
+        generator: 'stub',
       };
     };
   }
