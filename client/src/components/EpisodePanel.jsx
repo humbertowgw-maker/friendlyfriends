@@ -19,6 +19,8 @@ import {
   assembleSceneVideo,
   fullBuildEpisode,
   fetchEpisodePipelineStatus,
+  fetchSceneTemplates,
+  addSceneFromTemplate,
   fetchInventoryCharacters,
 } from '../lib/api.js';
 
@@ -50,6 +52,9 @@ export function EpisodePanel() {
   const [dragIdx, setDragIdx] = useState(null);
   const [generatingScene, setGeneratingScene] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
+  const [templates, setTemplates] = useState(null);
+  const [templateCategory, setTemplateCategory] = useState('');
+  const [showTemplates, setShowTemplates] = useState(false);
 
   useEffect(() => { loadAll(); }, []);
 
@@ -134,6 +139,18 @@ export function EpisodePanel() {
       await rejectEpisodeStage(epDetail.id, stage, 'user', notes);
       loadEpisode(epDetail.id);
     }
+  };
+
+  const loadTemplates = async () => {
+    const data = await fetchSceneTemplates(templateCategory || undefined);
+    setTemplates(data);
+  };
+
+  const handleAddTemplate = async (templateId) => {
+    if (!epDetail) return;
+    await addSceneFromTemplate(epDetail.id, templateId);
+    loadEpisode(epDetail.id);
+    setShowTemplates(false);
   };
 
   const handleSceneAction = async (sceneId, action) => {
@@ -288,8 +305,33 @@ export function EpisodePanel() {
 
           <div style={styles.header}>
             <h4 style={styles.cardTitle}>Scenes</h4>
-            <button style={styles.primaryBtn} onClick={() => setShowSceneForm(true)}>+ Add Scene</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={styles.secondaryBtn} onClick={() => { setShowTemplates(!showTemplates); if (!templates) loadTemplates(); }}>From Template</button>
+              <button style={styles.primaryBtn} onClick={() => setShowSceneForm(true)}>+ Add Scene</button>
+            </div>
           </div>
+          {showTemplates && (
+            <div style={styles.card}>
+              <h4 style={styles.cardTitle}>Scene Templates</h4>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                <button style={{ ...styles.filterBtn, ...(!templateCategory ? styles.filterBtnActive : {}) }} onClick={() => { setTemplateCategory(''); loadTemplates(); }}>All</button>
+                {templates?.categories && Object.entries(templates.categories).map(([key, cat]) => (
+                  <button key={key} style={{ ...styles.filterBtn, ...(templateCategory === key ? styles.filterBtnActive : {}) }} onClick={() => { setTemplateCategory(key); loadTemplates(); }}>{cat.name}</button>
+                ))}
+              </div>
+              {templates?.templates?.map(t => (
+                <div key={t.id} style={styles.templateRow}>
+                  <div style={styles.templateInfo}>
+                    <span style={styles.templateName}>{t.name}</span>
+                    <span style={styles.dim}>{t.category} &middot; {t.background_scene?.replace(/_/g, ' ')}</span>
+                    <span style={{ ...styles.dim, fontSize: 11 }}>{t.narration?.slice(0, 80)}...</span>
+                  </div>
+                  <button style={styles.primaryBtn} onClick={() => handleAddTemplate(t.id)}>Use</button>
+                </div>
+              ))}
+              <button style={styles.secondaryBtn} onClick={() => setShowTemplates(false)} >Close</button>
+            </div>
+          )}
           {showSceneForm && (
             <div style={styles.card}>
               <h4 style={styles.cardTitle}>New Scene</h4>
@@ -485,6 +527,11 @@ const styles = {
   bgPicker: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 },
   bgChip: { padding: '4px 10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 6, fontSize: 11, color: '#8888a0', cursor: 'pointer' },
   bgChipActive: { background: '#6366f1', color: '#fff', border: '1px solid #6366f1' },
+  filterBtn: { padding: '4px 10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 4, color: '#8888a0', fontSize: 11, cursor: 'pointer' },
+  filterBtnActive: { background: '#6366f1', color: '#fff', border: '1px solid #6366f1' },
+  templateRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #1a1a25' },
+  templateInfo: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1 },
+  templateName: { fontSize: 13, fontWeight: 600, color: '#e4e4ef' },
   logRow: { display: 'flex', gap: 8, padding: '4px 0', borderBottom: '1px solid #1a1a25', fontSize: 12 },
   logStep: { fontWeight: 600, color: '#6366f1', minWidth: 80 },
   logScene: { color: '#8888a0', flex: 1 },

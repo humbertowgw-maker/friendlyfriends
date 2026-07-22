@@ -181,6 +181,21 @@ export async function fetchExpressions() {
   return res.json();
 }
 
+export async function fetchSceneTemplates(category) {
+  const url = category ? `${API_BASE}/episodes/templates?category=${category}` : `${API_BASE}/episodes/templates`;
+  const res = await fetch(url);
+  return res.json();
+}
+
+export async function addSceneFromTemplate(episodeId, templateId) {
+  const res = await fetch(`${API_BASE}/episodes/${episodeId}/scenes/from-template`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ template_id: templateId }),
+  });
+  return res.json();
+}
+
 export async function fetchInventoryGaps(status) {
   const url = status ? `${API_BASE}/inventory/gaps?status=${status}` : `${API_BASE}/inventory/gaps`;
   const res = await fetch(url);
