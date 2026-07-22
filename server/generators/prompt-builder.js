@@ -52,6 +52,23 @@ const ACTION_POSES = {
   surprised: 'surprised expression, wide eyes, mouth open',
 };
 
+const BACKGROUNDS = {
+  living_room: 'cozy living room, warm lighting, soft couch, colorful toys, cartoon style, children book illustration',
+  backyard: 'sunny backyard, green grass, garden fence, flowers, blue sky, cartoon style, children book illustration',
+  kitchen: 'bright kitchen, checkered floor, warm sunlight through window, food bowls, cartoon style, children book illustration',
+  bedroom: 'cozy bedroom, soft blanket, pillow fort, nightlight, warm colors, cartoon style, children book illustration',
+  park: 'colorful park, playground, trees, birds, sunny day, cartoon style, children book illustration',
+  garden: 'beautiful garden, flowers, butterflies, green hedges, garden path, cartoon style, children book illustration',
+  pet_store: 'friendly pet store, shelves of toys, colorful cages, warm lighting, cartoon style, children book illustration',
+  veterinary: 'bright veterinary office, friendly, clean, plants, cartoon style, children book illustration',
+  beach: 'sunny beach, sand, waves, seashells, blue sky, cartoon style, children book illustration',
+  forest: 'enchanted forest, tall trees, dappled sunlight, mushrooms, friendly animals, cartoon style, children book illustration',
+  sky: 'bright blue sky, fluffy white clouds, birds flying, sunshine, cartoon style, children book illustration',
+  nighttime: 'peaceful nighttime, stars, moon, soft glow, fireflies, cartoon style, children book illustration',
+  indoor_general: 'warm indoor room, comfortable furniture, family home, cartoon style, children book illustration',
+  outdoor_general: 'sunny outdoor scene, nature, trees, path, blue sky, cartoon style, children book illustration',
+};
+
 export class PromptBuilder {
   static getCharacterDescription(slug) {
     return CHARACTER_PROMPTS[slug]?.full || CHARACTER_PROMPTS[slug]?.short || slug;
@@ -82,13 +99,28 @@ export class PromptBuilder {
     return `${char}, ${move}, ${style}, high quality, detailed`;
   }
 
+  static buildBackgroundPrompt(sceneName) {
+    const scene = BACKGROUNDS[sceneName] || `${sceneName.replace(/_/g, ' ')}, cartoon style, children book illustration, colorful, wide angle`;
+    const style = 'wide panoramic view, no characters, environment only, detailed background art, vibrant colors';
+    return `${scene}, ${style}, high quality, detailed`;
+  }
+
   static build(slug, actionLabel, assetType) {
     switch (assetType) {
       case 'expression': return this.buildExpressionPrompt(slug, actionLabel);
       case 'movement_cycle': return this.buildMovementPrompt(slug, actionLabel);
       case 'voice_line': return null; // No image for voice
+      case 'background_interaction': return this.buildBackgroundPrompt(actionLabel);
       default: return this.buildPosePrompt(slug, actionLabel);
     }
+  }
+
+  static getBackgroundScenes() {
+    return Object.keys(BACKGROUNDS);
+  }
+
+  static getBackgroundDescription(sceneName) {
+    return BACKGROUNDS[sceneName] || sceneName;
   }
 
   static getCharacterSlugs() {
