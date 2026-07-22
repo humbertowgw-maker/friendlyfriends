@@ -2,12 +2,15 @@ import { Router } from 'express';
 import { CharacterInventory } from './character-inventory.js';
 import { PipelineHook } from './pipeline-hook.js';
 import { BookIngestion } from './book-ingestion.js';
+import { VideoPipeline } from './video-pipeline.js';
 
 export function createInventoryRoutes(db) {
   const router = Router();
   const inventory = new CharacterInventory(db);
   const pipeline = new PipelineHook(inventory);
   const ingestion = new BookIngestion(db, inventory);
+  const videoPipeline = new VideoPipeline(inventory);
+  videoPipeline.setHook(pipeline);
 
   // --- Characters ---
 
@@ -170,6 +173,42 @@ export function createInventoryRoutes(db) {
     try {
       inventory.ignoreGap(Number(req.params.id));
       res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // --- Video pipeline ---
+
+  router.post('/pipeline/generate-scene', async (req, res) => {
+    try {
+      const { title, actions } = req.body;
+      if (!actions || !Array.isArray(actions) || actions.length === 0) {
+        return res.status(400).json({ error: 'actions array is required' });
+      }
+      const generateFn = async (charId, label, type) => {
+        const gen = PipelineHook.stubGenerator(label, type);
+        return await gen();
+      };
+      const result = await videoPipeline.generateScene({ title: title || 'Untitled Scene', actions }, generateFn);
+      res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/pipeline/process-episode', async (req, res) => {
+    try {
+      const { title, scenes } = req.body;
+      if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
+        return res.status(400).json({ error: 'scenes array is required' });
+      }
+      const generateFn = async (charId, label, type) => {
+        const gen = PipelineHook.stubGenerator(label, type);
+        return await gen();
+      };
+      const result = await videoPipeline.processEpisode({ title: title || 'Untitled Episode', scenes }, generateFn);
+      res.json(result);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
