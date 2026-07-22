@@ -162,6 +162,20 @@ export async function deleteAsset(type, filename) {
   return res.json();
 }
 
+export async function batchGenerate(data) {
+  const res = await fetch(`${API_BASE}/inventory/batch-generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function fetchBatchJob(jobId) {
+  const res = await fetch(`${API_BASE}/inventory/batch-generate/${jobId}`);
+  return res.json();
+}
+
 export async function fetchInventoryGaps(status) {
   const url = status ? `${API_BASE}/inventory/gaps?status=${status}` : `${API_BASE}/inventory/gaps`;
   const res = await fetch(url);

@@ -322,6 +322,83 @@ export function createInventoryRoutes(db, generators) {
     }
   });
 
+  // --- Batch generation ---
+
+  router.post('/batch-generate', async (req, res) => {
+    try {
+      const { characters, poses, backgrounds, register_assets = true } = req.body;
+      if (!characters?.length || !poses?.length) {
+        return res.status(400).json({ error: 'characters and poses arrays are required' });
+      }
+      if (!generators) {
+        return res.status(500).json({ error: 'No generators configured' });
+      }
+
+      const bgs = backgrounds?.length ? backgrounds : [null];
+      const jobs = [];
+      for (const slug of characters) {
+        for (const pose of poses) {
+          for (const bg of bgs) {
+            jobs.push({ slug, pose, bg });
+          }
+        }
+      }
+
+      const jobId = `batch-${Date.now()}`;
+      const results = { jobId, total: jobs.length, completed: 0, succeeded: 0, failed: 0, errors: [], assets: [] };
+
+      res.json({ jobId, total: jobs.length, started: true });
+
+      for (const job of jobs) {
+        try {
+          const prompt = job.bg
+            ? PromptBuilder.buildScenePrompt(job.slug, job.pose, job.bg)
+            : PromptBuilder.buildPosePrompt(job.slug, job.pose);
+
+          const result = await generators.generate({
+            character_slug: job.slug,
+            action_label: job.pose,
+            asset_type: job.bg ? 'scene' : 'pose',
+            prompt,
+          });
+
+          if (register_assets) {
+            const character = inventory.getCharacterBySlug(job.slug);
+            if (character) {
+              const label = job.bg ? `${job.pose} in ${job.bg}` : job.pose;
+              const asset = inventory.createAsset(character.id, {
+                type: job.bg ? 'scene' : 'pose',
+                label,
+                asset_ref: result.asset_ref,
+                metadata: result.metadata,
+                source: 'batch',
+              });
+              results.assets.push(asset);
+            }
+          }
+
+          results.succeeded++;
+        } catch (e) {
+          results.errors.push({ slug: job.slug, pose: job.pose, bg: job.bg, error: e.message });
+          results.failed++;
+        }
+        results.completed++;
+      }
+
+      batchJobs.set(jobId, results);
+    } catch (e) {
+      console.error('Batch generation error:', e);
+    }
+  });
+
+  const batchJobs = new Map();
+
+  router.get('/batch-generate/:jobId', (req, res) => {
+    const job = batchJobs.get(req.params.jobId);
+    if (!job) return res.status(404).json({ error: 'Job not found' });
+    res.json(job);
+  });
+
   // --- Generators ---
 
   router.get('/generators/status', async (req, res) => {
