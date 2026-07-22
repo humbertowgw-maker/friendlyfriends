@@ -19,6 +19,7 @@ import {
   deleteAsset,
   batchGenerate,
   fetchBatchJob,
+  fetchExpressions,
 } from '../lib/api.js';
 
 export function InventoryPanel() {
@@ -50,6 +51,7 @@ export function InventoryPanel() {
   const [batchBgs, setBatchBgs] = useState([]);
   const [batchJob, setBatchJob] = useState(null);
   const [batchProgress, setBatchProgress] = useState(null);
+  const [exprGrid, setExprGrid] = useState(null);
 
   useEffect(() => {
     loadOverview();
@@ -220,17 +222,22 @@ export function InventoryPanel() {
     setArr(arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item]);
   };
 
+  const loadExpressions = async () => {
+    const data = await fetchExpressions();
+    setExprGrid(data);
+  };
+
   const pendingGaps = gaps.filter(g => g.status === 'pending');
   const typeIcons = { pose: 'P', movement_cycle: 'M', expression: 'E', voice_line: 'V', background_interaction: 'B' };
 
   return (
     <div>
       <div style={styles.tabBar}>
-        {['overview', 'characters', 'generate', 'assets', 'gaps', 'ingest', 'pipeline'].map(t => (
+        {['overview', 'characters', 'generate', 'assets', 'expressions', 'gaps', 'ingest', 'pipeline'].map(t => (
           <button
             key={t}
             style={{ ...styles.tabBtn, ...(tab === t ? styles.tabBtnActive : {}) }}
-            onClick={() => { setTab(t); if (t === 'generate') loadPoseOptions(); if (t === 'assets') loadAssets(); }}
+            onClick={() => { setTab(t); if (t === 'generate') loadPoseOptions(); if (t === 'assets') loadAssets(); if (t === 'expressions') loadExpressions(); }}
           >
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -619,6 +626,51 @@ export function InventoryPanel() {
         </div>
       )}
 
+      {tab === 'expressions' && (
+        <div>
+          {exprGrid ? (
+            <div>
+              <div style={{ marginBottom: 12 }}>
+                <span style={styles.dim}>{exprGrid.characters.length} characters × {exprGrid.expressions.length} expressions</span>
+              </div>
+              <div style={styles.exprTable}>
+                <div style={styles.exprHeader}>
+                  <span style={styles.exprName}></span>
+                  {exprGrid.expressions.map(e => (
+                    <span key={e} style={styles.exprColLabel}>{e}</span>
+                  ))}
+                </div>
+                {exprGrid.characters.map(slug => (
+                  <div key={slug} style={styles.exprRow}>
+                    <span style={styles.exprName}>{slug}</span>
+                    {exprGrid.expressions.map(expr => {
+                      const assets = exprGrid.grid[slug]?.[expr] || [];
+                      return (
+                        <div key={expr} style={styles.exprCell}>
+                          {assets.length > 0 ? (
+                            <img
+                              src={`/assets/${assets[0].asset_ref}`}
+                              alt={`${slug} ${expr}`}
+                              style={styles.exprImg}
+                              onClick={() => setPreviewAsset({ type: 'image', path: assets[0].asset_ref, filename: `${slug}-${expr}.png`, size: 0, created: new Date().toISOString() })}
+                            />
+                          ) : (
+                            <div style={styles.exprEmpty}>—</div>
+                          )}
+                          <span style={styles.exprCount}>{assets.length}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p style={styles.dim}>Loading expressions...</p>
+          )}
+        </div>
+      )}
+
       {tab === 'gaps' && (
         <div>
           <div style={styles.gapSummary}>
@@ -826,4 +878,13 @@ const styles = {
   healthRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' },
   healthDot: { width: 8, height: 8, borderRadius: '50%' },
   healthName: { fontSize: 12, color: '#e4e4ef', width: 100 },
+  exprTable: { display: 'flex', flexDirection: 'column', gap: 2 },
+  exprHeader: { display: 'flex', gap: 2, marginBottom: 4 },
+  exprRow: { display: 'flex', gap: 2 },
+  exprName: { width: 90, fontSize: 11, color: '#e4e4ef', padding: '6px 8px', fontWeight: 600, display: 'flex', alignItems: 'center' },
+  exprColLabel: { width: 90, textAlign: 'center', fontSize: 11, color: '#8888a0', padding: '4px 0', fontWeight: 600 },
+  exprCell: { width: 90, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 },
+  exprImg: { width: 80, height: 80, borderRadius: 6, objectFit: 'cover', border: '1px solid #2a2a3a', cursor: 'pointer' },
+  exprEmpty: { width: 80, height: 80, borderRadius: 6, background: '#1a1a25', border: '1px solid #2a2a3a', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4a4a5a', fontSize: 16 },
+  exprCount: { fontSize: 9, color: '#8888a0' },
 };

@@ -176,6 +176,11 @@ export async function fetchBatchJob(jobId) {
   return res.json();
 }
 
+export async function fetchExpressions() {
+  const res = await fetch(`${API_BASE}/inventory/expressions`);
+  return res.json();
+}
+
 export async function fetchInventoryGaps(status) {
   const url = status ? `${API_BASE}/inventory/gaps?status=${status}` : `${API_BASE}/inventory/gaps`;
   const res = await fetch(url);
