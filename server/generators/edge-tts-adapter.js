@@ -36,12 +36,21 @@ export class EdgeTTSAdapter {
   }
 
   checkAvailability() {
-    try {
-      execSync('edge-tts --version', { stdio: 'pipe', timeout: 5000 });
-      this.available = true;
-    } catch {
-      this.available = false;
+    const paths = [
+      'edge-tts',
+      join(process.env.APPDATA || '', 'Python', 'Python314', 'Scripts', 'edge-tts.exe'),
+      join(process.env.APPDATA || '', 'Python', 'Python312', 'Scripts', 'edge-tts.exe'),
+      join(process.env.APPDATA || '', 'Python', 'Python311', 'Scripts', 'edge-tts.exe'),
+    ];
+    for (const cmd of paths) {
+      try {
+        execSync(`"${cmd}" --version`, { stdio: 'pipe', timeout: 5000 });
+        this.cmd = cmd;
+        this.available = true;
+        return;
+      } catch {}
     }
+    this.available = false;
   }
 
   isConfigured() {
@@ -67,7 +76,7 @@ export class EdgeTTSAdapter {
     const rateStr = rate.startsWith('+') || rate.startsWith('-') ? rate : `+${rate}%`;
     const pitchStr = pitch.startsWith('+') || pitch.startsWith('-') ? pitch : `+${pitch}Hz`;
 
-    const cmd = `edge-tts --voice "${voice}" --rate="${rateStr}" --pitch="${pitchStr}" --text "${text.replace(/"/g, '\\"')}" --write-media "${filePath}"`;
+    const cmd = `"${this.cmd}" --voice "${voice}" --rate="${rateStr}" --pitch="${pitchStr}" --text "${text.replace(/"/g, '\\"')}" --write-media "${filePath}"`;
 
     try {
       execSync(cmd, { stdio: 'pipe', timeout: 30000 });
