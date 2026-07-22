@@ -5,6 +5,7 @@ import { VideoPipeline } from './video-pipeline.js';
 import { AudioPipeline } from './audio-pipeline.js';
 import { VideoAssembler } from './video-assembler.js';
 import { PromptBuilder } from '../generators/prompt-builder.js';
+import { SCENE_TEMPLATES, TEMPLATE_CATEGORIES } from './scene-templates.js';
 import { existsSync, createReadStream } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -367,6 +368,43 @@ export function createEpisodeRoutes(db, generators, ttsAdapter) {
       res.setHeader('Content-Type', 'video/mp4');
       const stream = createReadStream(videoPath);
       stream.pipe(res);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // --- Templates ---
+
+  router.get('/templates', (req, res) => {
+    try {
+      const category = req.query.category;
+      const templates = category
+        ? SCENE_TEMPLATES.filter(t => t.category === category)
+        : SCENE_TEMPLATES;
+      res.json({ templates, categories: TEMPLATE_CATEGORIES });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/:id/scenes/from-template', (req, res) => {
+    try {
+      const { template_id } = req.body;
+      const template = SCENE_TEMPLATES.find(t => t.id === template_id);
+      if (!template) return res.status(404).json({ error: 'Template not found' });
+
+      const ep = episodes.getEpisode(Number(req.params.id));
+      if (!ep) return res.status(404).json({ error: 'Episode not found' });
+
+      const scene = episodes.addScene(ep.id, {
+        title: template.name,
+        narration: template.narration,
+        background_scene: template.background_scene,
+        actions: template.actions,
+        dialogue: template.dialogue,
+      });
+
+      res.status(201).json(scene);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
