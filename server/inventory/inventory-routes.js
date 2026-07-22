@@ -280,6 +280,29 @@ export function createInventoryRoutes(db, generators) {
     }
   });
 
+  router.get('/expressions', (req, res) => {
+    try {
+      const expressions = ['happy', 'sad', 'excited', 'scared', 'curious'];
+      const characters = PromptBuilder.getCharacterSlugs();
+      const grid = {};
+      for (const slug of characters) {
+        grid[slug] = {};
+        for (const expr of expressions) {
+          const character = inventory.getCharacterBySlug(slug);
+          if (character) {
+            const assets = inventory.getAssets(character.id, { type: 'expression' });
+            grid[slug][expr] = assets.filter(a => a.label.includes(expr)) || [];
+          } else {
+            grid[slug][expr] = [];
+          }
+        }
+      }
+      res.json({ expressions, characters, grid });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   router.post('/generate-pose', async (req, res) => {
     try {
       const { character_slug, action_label, background, register_as_asset } = req.body;
