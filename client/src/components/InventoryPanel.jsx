@@ -249,31 +249,63 @@ export function InventoryPanel() {
               <div style={styles.statLbl}>Total Assets</div>
             </div>
             <div style={styles.statCard}>
+              <div style={styles.statNum}>{stats.episodes || 0}</div>
+              <div style={styles.statLbl}>Episodes</div>
+            </div>
+            <div style={styles.statCard}>
               <div style={{ ...styles.statNum, color: pendingGaps.length > 0 ? '#eab308' : '#4ade80' }}>{stats.pending_gaps}</div>
               <div style={styles.statLbl}>Pending Gaps</div>
             </div>
-            <div style={styles.statCard}>
-              <div style={styles.statNum}>{stats.total_references}</div>
-              <div style={styles.statLbl}>Script References</div>
-            </div>
           </div>
+
+          {stats.character_assets && stats.character_assets.length > 0 && (
+            <div style={styles.card}>
+              <h4 style={styles.cardTitle}>Character Coverage</h4>
+              <div style={styles.heatmap}>
+                <div style={styles.heatmapHeader}>
+                  <span style={styles.heatmapName}></span>
+                  <span style={styles.heatmapCell}>Pose</span>
+                  <span style={styles.heatmapCell}>Expr</span>
+                  <span style={styles.heatmapCell}>Move</span>
+                  <span style={styles.heatmapCell}>Scene</span>
+                  <span style={styles.heatmapCell}>Total</span>
+                </div>
+                {stats.character_assets.map(c => (
+                  <div key={c.slug} style={styles.heatmapRow}>
+                    <span style={styles.heatmapName}>{c.name}</span>
+                    <span style={{ ...styles.heatmapCell, ...(c.poses > 0 ? styles.heatmapFilled : {}) }}>{c.poses || 0}</span>
+                    <span style={{ ...styles.heatmapCell, ...(c.expressions > 0 ? styles.heatmapFilled : {}) }}>{c.expressions || 0}</span>
+                    <span style={{ ...styles.heatmapCell, ...(c.movements > 0 ? styles.heatmapFilled : {}) }}>{c.movements || 0}</span>
+                    <span style={{ ...styles.heatmapCell, ...(c.scenes > 0 ? styles.heatmapFilled : {}) }}>{c.scenes || 0}</span>
+                    <span style={{ ...styles.heatmapCell, fontWeight: 700 }}>{c.asset_count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {stats.asset_type_breakdown.length > 0 && (
             <div style={styles.card}>
               <h4 style={styles.cardTitle}>Asset Breakdown</h4>
               {stats.asset_type_breakdown.map(t => (
                 <div key={t.type} style={styles.breakdownRow}>
                   <span style={styles.breakdownType}>{typeIcons[t.type] || '?'} {t.type}</span>
+                  <div style={styles.breakdownBar}>
+                    <div style={{ ...styles.breakdownFill, width: `${(t.count / stats.total_assets) * 100}%` }} />
+                  </div>
                   <span style={styles.breakdownCount}>{t.count}</span>
                 </div>
               ))}
             </div>
           )}
+
           {generators && generators.configured && (
             <div style={styles.card}>
-              <h4 style={styles.cardTitle}>Generators</h4>
+              <h4 style={styles.cardTitle}>Pipeline Health</h4>
               {generators.adapters.map(a => (
-                <div key={a.name} style={styles.breakdownRow}>
-                  <span style={styles.breakdownType}>{a.name}</span>
+                <div key={a.name} style={styles.healthRow}>
+                  <span style={{ ...styles.healthDot, background: a.status === 'online' ? '#4ade80' : a.status === 'configured' ? '#eab308' : '#ef4444' }} />
+                  <span style={styles.healthName}>{a.name}</span>
                   <span style={{ color: a.status === 'online' ? '#4ade80' : a.status === 'configured' ? '#eab308' : '#8888a0', fontSize: 11 }}>
                     {a.status}{a.mode ? ` (${a.mode})` : ''}
                   </span>
@@ -281,7 +313,7 @@ export function InventoryPanel() {
               ))}
               {generators.stats.total > 0 && (
                 <div style={{ marginTop: 8, fontSize: 11, color: '#8888a0' }}>
-                  {generators.stats.total} generated
+                  {generators.stats.total} generated this session
                   {Object.entries(generators.stats.by_generator).map(([name, count]) => (
                     <span key={name}> | {name}: {count}</span>
                   ))}
@@ -291,7 +323,7 @@ export function InventoryPanel() {
           )}
           {generators && !generators.configured && (
             <div style={styles.card}>
-              <h4 style={styles.cardTitle}>Generators</h4>
+              <h4 style={styles.cardTitle}>Pipeline Health</h4>
               <p style={styles.dim}>No generators configured. Add SD_WEBUI_URL, COMFYUI_URL, or HF_API_TOKEN to .env</p>
               <p style={styles.dim}>Pollinations.ai is always available as a free fallback.</p>
             </div>
@@ -780,4 +812,18 @@ const styles = {
   progressBar: { width: '100%', height: 6, background: '#1a1a25', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', background: '#6366f1', borderRadius: 3, transition: 'width 0.3s ease' },
   exprChip: { padding: '4px 10px', background: '#1e3a5f', border: '1px solid #2a2a3a', borderRadius: 6, fontSize: 11, color: '#60a5fa', fontWeight: 600 },
+  heatmap: { display: 'flex', flexDirection: 'column', gap: 2 },
+  heatmapHeader: { display: 'flex', gap: 0, marginBottom: 4 },
+  heatmapRow: { display: 'flex', gap: 0 },
+  heatmapName: { width: 90, fontSize: 11, color: '#e4e4ef', padding: '4px 8px', fontWeight: 600 },
+  heatmapCell: { width: 48, textAlign: 'center', fontSize: 11, color: '#8888a0', padding: '4px 0', background: '#1a1a25', borderRadius: 2 },
+  heatmapFilled: { background: '#166534', color: '#4ade80' },
+  breakdownRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' },
+  breakdownType: { fontSize: 12, color: '#e4e4ef', width: 120 },
+  breakdownBar: { flex: 1, height: 6, background: '#1a1a25', borderRadius: 3, overflow: 'hidden' },
+  breakdownFill: { height: '100%', background: '#6366f1', borderRadius: 3 },
+  breakdownCount: { fontSize: 12, color: '#8888a0', width: 30, textAlign: 'right' },
+  healthRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' },
+  healthDot: { width: 8, height: 8, borderRadius: '50%' },
+  healthName: { fontSize: 12, color: '#e4e4ef', width: 100 },
 };

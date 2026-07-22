@@ -214,6 +214,18 @@ export class CharacterInventory {
     const assetTypeBreakdown = this.db.prepare(
       'SELECT type, COUNT(*) as count FROM animation_assets GROUP BY type ORDER BY count DESC'
     ).all();
+    const charAssets = this.db.prepare(
+      `SELECT c.name, c.slug, COUNT(a.id) as asset_count,
+        SUM(CASE WHEN a.type = 'pose' THEN 1 ELSE 0 END) as poses,
+        SUM(CASE WHEN a.type = 'expression' THEN 1 ELSE 0 END) as expressions,
+        SUM(CASE WHEN a.type = 'movement_cycle' THEN 1 ELSE 0 END) as movements,
+        SUM(CASE WHEN a.type = 'scene' THEN 1 ELSE 0 END) as scenes
+       FROM characters c LEFT JOIN animation_assets a ON c.id = a.character_id
+       WHERE c.status = 'active' GROUP BY c.id ORDER BY c.name`
+    ).all();
+    const totalSize = this.db.prepare('SELECT SUM(LENGTH(metadata)) as total FROM animation_assets').get();
+    const episodes = this.db.prepare('SELECT COUNT(*) as count FROM episodes').get();
+    const scenes = this.db.prepare('SELECT COUNT(*) as count FROM scenes').get();
     return {
       characters: characters.count,
       total_assets: assets.count,
@@ -221,6 +233,9 @@ export class CharacterInventory {
       resolved_references: resolvedRefs.count,
       total_references: totalRefs.count,
       asset_type_breakdown: assetTypeBreakdown,
+      character_assets: charAssets,
+      episodes: episodes.count,
+      total_scenes: scenes.count,
     };
   }
 }
