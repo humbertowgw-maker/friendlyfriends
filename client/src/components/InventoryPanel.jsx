@@ -15,6 +15,8 @@ import {
   updateCharacter,
   fetchPoseOptions,
   generatePose,
+  fetchAssets,
+  deleteAsset,
 } from '../lib/api.js';
 
 export function InventoryPanel() {
@@ -38,6 +40,9 @@ export function InventoryPanel() {
   const [poseForm, setPoseForm] = useState({ character_slug: 'achilles', action_label: 'sitting', background: '' });
   const [poseResult, setPoseResult] = useState(null);
   const [poseLoading, setPoseLoading] = useState(false);
+  const [allAssets, setAllAssets] = useState(null);
+  const [assetFilter, setAssetFilter] = useState('');
+  const [previewAsset, setPreviewAsset] = useState(null);
 
   useEffect(() => {
     loadOverview();
@@ -162,17 +167,29 @@ export function InventoryPanel() {
     setPoseLoading(false);
   };
 
+  const loadAssets = async () => {
+    const data = await fetchAssets();
+    setAllAssets(data);
+  };
+
+  const handleDeleteAsset = async (type, filename) => {
+    if (!confirm(`Delete ${filename}?`)) return;
+    await deleteAsset(type, filename);
+    setPreviewAsset(null);
+    loadAssets();
+  };
+
   const pendingGaps = gaps.filter(g => g.status === 'pending');
   const typeIcons = { pose: 'P', movement_cycle: 'M', expression: 'E', voice_line: 'V', background_interaction: 'B' };
 
   return (
     <div>
       <div style={styles.tabBar}>
-        {['overview', 'characters', 'generate', 'gaps', 'ingest', 'pipeline'].map(t => (
+        {['overview', 'characters', 'generate', 'assets', 'gaps', 'ingest', 'pipeline'].map(t => (
           <button
             key={t}
             style={{ ...styles.tabBtn, ...(tab === t ? styles.tabBtnActive : {}) }}
-            onClick={() => { setTab(t); if (t === 'generate') loadPoseOptions(); }}
+            onClick={() => { setTab(t); if (t === 'generate') loadPoseOptions(); if (t === 'assets') loadAssets(); }}
           >
             {t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -384,6 +401,58 @@ export function InventoryPanel() {
         </div>
       )}
 
+      {tab === 'assets' && (
+        <div>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+            <span style={styles.dim}>{allAssets?.total || 0} assets</span>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {['', 'image', 'audio', 'video'].map(t => (
+                <button
+                  key={t}
+                  style={{ ...styles.filterBtn, ...(assetFilter === t ? styles.filterBtnActive : {}) }}
+                  onClick={() => setAssetFilter(t)}
+                >
+                  {t || 'All'}
+                </button>
+              ))}
+            </div>
+            <button style={styles.secondaryBtn} onClick={loadAssets}>Refresh</button>
+          </div>
+          {allAssets ? (
+            <div style={styles.assetGrid}>
+              {allAssets.assets
+                .filter(a => !assetFilter || a.type === assetFilter)
+                .map(asset => (
+                  <div key={asset.id} style={styles.assetCard} onClick={() => setPreviewAsset(asset)}>
+                    {asset.type === 'image' && (
+                      <img src={`/assets/${asset.path}`} alt={asset.filename} style={styles.assetThumb} />
+                    )}
+                    {asset.type === 'audio' && (
+                      <div style={styles.assetThumbAudio}>
+                        <span style={{ fontSize: 24, color: '#6366f1' }}>AU</span>
+                      </div>
+                    )}
+                    {asset.type === 'video' && (
+                      <div style={styles.assetThumbVideo}>
+                        <span style={{ fontSize: 24, color: '#4ade80' }}>VD</span>
+                      </div>
+                    )}
+                    <div style={styles.assetInfo}>
+                      <span style={styles.assetName} title={asset.filename}>{asset.filename.length > 24 ? asset.filename.slice(0, 24) + '...' : asset.filename}</span>
+                      <span style={styles.assetMeta}>{asset.type} &middot; {(asset.size / 1024).toFixed(1)}KB</span>
+                    </div>
+                  </div>
+                ))}
+              {allAssets.assets.filter(a => !assetFilter || a.type === assetFilter).length === 0 && (
+                <p style={styles.dim}>No assets found. Generate some in the Generate tab!</p>
+              )}
+            </div>
+          ) : (
+            <p style={styles.dim}>Loading assets...</p>
+          )}
+        </div>
+      )}
+
       {tab === 'gaps' && (
         <div>
           <div style={styles.gapSummary}>
@@ -479,6 +548,31 @@ export function InventoryPanel() {
           )}
         </div>
       )}
+
+      {previewAsset && (
+        <div style={styles.overlay} onClick={() => setPreviewAsset(null)}>
+          <div style={styles.previewContainer} onClick={e => e.stopPropagation()}>
+            {previewAsset.type === 'image' && <img src={`/assets/${previewAsset.path}`} style={styles.previewImg} />}
+            {previewAsset.type === 'audio' && (
+              <div style={styles.previewAudio}>
+                <audio controls src={`/assets/${previewAsset.path}`} style={{ width: 300 }} />
+              </div>
+            )}
+            {previewAsset.type === 'video' && (
+              <video controls src={`/assets/${previewAsset.path}`} style={styles.previewVideo} />
+            )}
+            <div style={styles.previewInfo}>
+              <span style={styles.previewName}>{previewAsset.filename}</span>
+              <span style={styles.dim}>{previewAsset.type} &middot; {(previewAsset.size / 1024).toFixed(1)}KB &middot; {new Date(previewAsset.created).toLocaleString()}</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+              <a href={`/assets/${previewAsset.path}`} download style={styles.primaryBtn}>Download</a>
+              <button style={{ ...styles.secondaryBtn, color: '#ef4444' }} onClick={() => handleDeleteAsset(previewAsset.type, previewAsset.filename)}>Delete</button>
+              <button style={styles.secondaryBtn} onClick={() => setPreviewAsset(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -534,4 +628,19 @@ const styles = {
   gapBadge: { padding: '3px 8px', background: '#713f12', color: '#eab308', borderRadius: 4, fontSize: 11, fontWeight: 600 },
   sceneResult: { marginBottom: 10 },
   sceneTitle: { fontSize: 12, fontWeight: 600, color: '#e4e4ef', marginBottom: 4 },
+  filterBtn: { padding: '4px 10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 4, color: '#8888a0', fontSize: 11, cursor: 'pointer' },
+  filterBtnActive: { background: '#6366f1', color: '#fff', border: '1px solid #6366f1' },
+  assetGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 },
+  assetCard: { background: '#12121a', border: '1px solid #2a2a3a', borderRadius: 8, overflow: 'hidden', cursor: 'pointer' },
+  assetThumb: { width: '100%', height: 120, objectFit: 'cover' },
+  assetThumbAudio: { width: '100%', height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a25' },
+  assetThumbVideo: { width: '100%', height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a25' },
+  assetName: { fontSize: 11, color: '#e4e4ef', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '6px 8px 0' },
+  overlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
+  previewContainer: { background: '#12121a', border: '1px solid #2a2a3a', borderRadius: 12, padding: 20, maxWidth: 600, width: '90vw' },
+  previewImg: { width: '100%', borderRadius: 8, marginBottom: 12 },
+  previewVideo: { width: '100%', borderRadius: 8, marginBottom: 12 },
+  previewAudio: { padding: 20, textAlign: 'center', marginBottom: 12 },
+  previewInfo: { display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 8 },
+  previewName: { fontSize: 13, fontWeight: 600, color: '#e4e4ef' },
 };
