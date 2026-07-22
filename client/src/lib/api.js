@@ -252,6 +252,15 @@ export async function updateScene(sceneId, data) {
   return res.json();
 }
 
+export async function reorderScenes(episodeId, sceneIds) {
+  const res = await fetch(`${API_BASE}/episodes/${episodeId}/scenes/reorder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scene_ids: sceneIds }),
+  });
+  return res.json();
+}
+
 export async function deleteScene(sceneId) {
   const res = await fetch(`${API_BASE}/episodes/scenes/${sceneId}`, { method: 'DELETE' });
   return res.json();
