@@ -89,6 +89,24 @@ export async function fetchInventoryCharacter(id) {
   return res.json();
 }
 
+export async function createCharacter(data) {
+  const res = await fetch(`${API_BASE}/inventory/characters`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+export async function updateCharacter(id, data) {
+  const res = await fetch(`${API_BASE}/inventory/characters/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
 export async function fetchInventoryAssets(characterId, type) {
   const url = type
     ? `${API_BASE}/inventory/characters/${characterId}/assets?type=${type}`

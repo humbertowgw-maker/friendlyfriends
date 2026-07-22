@@ -11,6 +11,8 @@ import {
   generateScene,
   registerAsset,
   fetchGeneratorStatus,
+  createCharacter,
+  updateCharacter,
 } from '../lib/api.js';
 
 export function InventoryPanel() {
@@ -27,6 +29,9 @@ export function InventoryPanel() {
   const [sceneResult, setSceneResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [generators, setGenerators] = useState(null);
+  const [showCharForm, setShowCharForm] = useState(false);
+  const [editingChar, setEditingChar] = useState(null);
+  const [charForm, setCharForm] = useState({ name: '', slug: '', description: '' });
 
   useEffect(() => {
     loadOverview();
@@ -97,6 +102,33 @@ export function InventoryPanel() {
   const handleIgnoreGap = async (id) => {
     await ignoreGap(id);
     setGaps(await fetchInventoryGaps());
+  };
+
+  const handleCreateChar = async () => {
+    if (!charForm.name || !charForm.slug) return;
+    await createCharacter(charForm);
+    setCharForm({ name: '', slug: '', description: '' });
+    setShowCharForm(false);
+    const chars = await fetchInventoryCharacters();
+    setCharacters(chars);
+  };
+
+  const handleUpdateChar = async () => {
+    if (!editingChar) return;
+    await updateCharacter(editingChar.id, charForm);
+    setEditingChar(null);
+    setShowCharForm(false);
+    const chars = await fetchInventoryCharacters();
+    setCharacters(chars);
+    if (selectedChar === editingChar.id) {
+      loadCharacter(editingChar.id);
+    }
+  };
+
+  const startEditChar = (char) => {
+    setEditingChar(char);
+    setCharForm({ name: char.name, slug: char.slug, description: char.description || '' });
+    setShowCharForm(true);
   };
 
   const pendingGaps = gaps.filter(g => g.status === 'pending');
@@ -179,7 +211,23 @@ export function InventoryPanel() {
       )}
 
       {tab === 'characters' && (
-        <div style={styles.charLayout}>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <button style={styles.primaryBtn} onClick={() => { setEditingChar(null); setCharForm({ name: '', slug: '', description: '' }); setShowCharForm(true); }}>+ New Character</button>
+          </div>
+          {showCharForm && (
+            <div style={styles.card}>
+              <h4 style={styles.cardTitle}>{editingChar ? 'Edit Character' : 'New Character'}</h4>
+              <input style={styles.input} placeholder="Name" value={charForm.name} onChange={e => setCharForm({ ...charForm, name: e.target.value, slug: editingChar ? charForm.slug : e.target.value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '') })} />
+              <input style={styles.input} placeholder="Slug" value={charForm.slug} onChange={e => setCharForm({ ...charForm, slug: e.target.value })} disabled={!!editingChar} />
+              <textarea style={styles.textarea} rows={2} placeholder="Description (traits, appearance)" value={charForm.description} onChange={e => setCharForm({ ...charForm, description: e.target.value })} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button style={styles.primaryBtn} onClick={editingChar ? handleUpdateChar : handleCreateChar}>{editingChar ? 'Update' : 'Create'}</button>
+                <button style={styles.secondaryBtn} onClick={() => { setShowCharForm(false); setEditingChar(null); }}>Cancel</button>
+              </div>
+            </div>
+          )}
+          <div style={styles.charLayout}>
           <div style={styles.charList}>
             {characters.map(c => (
               <div
@@ -195,7 +243,10 @@ export function InventoryPanel() {
           <div style={styles.charDetail}>
             {charDetail ? (
               <div>
-                <h3 style={styles.detailName}>{charDetail.name}</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <h3 style={styles.detailName}>{charDetail.name}</h3>
+                  <button style={styles.secondaryBtn} onClick={() => startEditChar(charDetail)}>Edit</button>
+                </div>
                 <p style={styles.detailDesc}>{charDetail.description}</p>
                 <div style={styles.detailStats}>
                   <span>{charDetail.stats.total_assets} assets</span>
@@ -232,6 +283,7 @@ export function InventoryPanel() {
               <p style={styles.dim}>Select a character</p>
             )}
           </div>
+        </div>
         </div>
       )}
 
@@ -377,6 +429,8 @@ const styles = {
   ignoreBtn: { padding: '4px 10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 4, color: '#8888a0', fontSize: 11, cursor: 'pointer' },
   textarea: { width: '100%', padding: 10, background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 8, color: '#e4e4ef', fontSize: 12, fontFamily: 'monospace', resize: 'vertical', marginBottom: 10 },
   primaryBtn: { padding: '8px 16px', background: '#6366f1', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  secondaryBtn: { padding: '8px 16px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 6, color: '#8888a0', fontSize: 12, cursor: 'pointer' },
+  input: { width: '100%', padding: '8px 10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 6, color: '#e4e4ef', fontSize: 12, marginBottom: 8, boxSizing: 'border-box' },
   resultSummary: { display: 'flex', gap: 8, marginBottom: 12 },
   reusedBadge: { padding: '3px 8px', background: '#166534', color: '#4ade80', borderRadius: 4, fontSize: 11, fontWeight: 600 },
   generatedBadge: { padding: '3px 8px', background: '#1e3a5f', color: '#60a5fa', borderRadius: 4, fontSize: 11, fontWeight: 600 },
