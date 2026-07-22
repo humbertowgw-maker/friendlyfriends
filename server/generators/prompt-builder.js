@@ -105,6 +105,14 @@ export class PromptBuilder {
     return `${scene}, ${style}, high quality, detailed`;
   }
 
+  static buildScenePrompt(slug, actionLabel, backgroundName) {
+    const char = this.getCharacterDescription(slug);
+    const action = ACTION_POSES[actionLabel] || actionLabel.replace(/_/g, ' ');
+    const bg = BACKGROUNDS[backgroundName] || backgroundName.replace(/_/g, ' ');
+    const style = 'cartoon style, children book illustration, colorful, cute, friendly, 2D animation, clean bold lines, vibrant colors';
+    return `${char}, ${action}, in a ${bg}, ${style}, high quality, detailed`;
+  }
+
   static build(slug, actionLabel, assetType) {
     switch (assetType) {
       case 'expression': return this.buildExpressionPrompt(slug, actionLabel);
@@ -125,6 +133,10 @@ export class PromptBuilder {
 
   static getCharacterSlugs() {
     return Object.keys(CHARACTER_PROMPTS);
+  }
+
+  static getActionPoses() {
+    return Object.keys(ACTION_POSES);
   }
 
   static registerCharacter(slug, description) {

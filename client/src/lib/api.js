@@ -137,6 +137,20 @@ export async function fetchInventoryStats() {
   return res.json();
 }
 
+export async function fetchPoseOptions() {
+  const res = await fetch(`${API_BASE}/inventory/poses`);
+  return res.json();
+}
+
+export async function generatePose(data) {
+  const res = await fetch(`${API_BASE}/inventory/generate-pose`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
 export async function fetchInventoryGaps(status) {
   const url = status ? `${API_BASE}/inventory/gaps?status=${status}` : `${API_BASE}/inventory/gaps`;
   const res = await fetch(url);
