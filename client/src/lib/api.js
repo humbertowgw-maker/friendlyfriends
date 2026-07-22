@@ -151,6 +151,17 @@ export async function generatePose(data) {
   return res.json();
 }
 
+export async function fetchAssets(type) {
+  const url = type ? `${API_BASE}/inventory/assets?type=${type}` : `${API_BASE}/inventory/assets`;
+  const res = await fetch(url);
+  return res.json();
+}
+
+export async function deleteAsset(type, filename) {
+  const res = await fetch(`${API_BASE}/inventory/assets/${type}/${filename}`, { method: 'DELETE' });
+  return res.json();
+}
+
 export async function fetchInventoryGaps(status) {
   const url = status ? `${API_BASE}/inventory/gaps?status=${status}` : `${API_BASE}/inventory/gaps`;
   const res = await fetch(url);

@@ -4,6 +4,12 @@ import { PipelineHook } from './pipeline-hook.js';
 import { BookIngestion } from './book-ingestion.js';
 import { VideoPipeline } from './video-pipeline.js';
 import { PromptBuilder } from '../generators/prompt-builder.js';
+import { readdirSync, statSync, existsSync, unlinkSync } from 'fs';
+import { join, dirname, extname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ASSETS_DIR = join(__dirname, '..', 'data', 'assets');
 
 export function createInventoryRoutes(db, generators) {
   const router = Router();
@@ -66,6 +72,53 @@ export function createInventoryRoutes(db, generators) {
   });
 
   // --- Animation Assets ---
+
+  router.get('/assets', (req, res) => {
+    try {
+      const type = req.query.type || null;
+      const assets = [];
+      const dirs = { images: 'image', audio: 'audio', video: 'video' };
+      for (const [dir, assetType] of Object.entries(dirs)) {
+        if (type && type !== assetType) continue;
+        const dirPath = join(ASSETS_DIR, dir);
+        if (!existsSync(dirPath)) continue;
+        const files = readdirSync(dirPath).filter(f => !f.startsWith('.'));
+        for (const file of files) {
+          const filePath = join(dirPath, file);
+          try {
+            const stat = statSync(filePath);
+            assets.push({
+              id: `${dir}/${file}`,
+              type: assetType,
+              filename: file,
+              path: `${dir}/${file}`,
+              size: stat.size,
+              created: stat.birthtime.toISOString(),
+              modified: stat.mtime.toISOString(),
+            });
+          } catch {}
+        }
+      }
+      assets.sort((a, b) => new Date(b.created) - new Date(a.created));
+      res.json({ assets, total: assets.length });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.delete('/assets/:type/:filename', (req, res) => {
+    try {
+      const { type, filename } = req.params;
+      const allowed = ['images', 'audio', 'video'];
+      if (!allowed.includes(type)) return res.status(400).json({ error: 'Invalid asset type' });
+      const filePath = join(ASSETS_DIR, type, filename);
+      if (!existsSync(filePath)) return res.status(404).json({ error: 'Asset not found' });
+      unlinkSync(filePath);
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
 
   router.get('/characters/:id/assets', (req, res) => {
     try {
