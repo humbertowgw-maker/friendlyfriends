@@ -17,6 +17,8 @@ import {
   generatePose,
   fetchAssets,
   deleteAsset,
+  batchGenerate,
+  fetchBatchJob,
 } from '../lib/api.js';
 
 export function InventoryPanel() {
@@ -43,6 +45,11 @@ export function InventoryPanel() {
   const [allAssets, setAllAssets] = useState(null);
   const [assetFilter, setAssetFilter] = useState('');
   const [previewAsset, setPreviewAsset] = useState(null);
+  const [batchChars, setBatchChars] = useState(['achilles']);
+  const [batchPoses, setBatchPoses] = useState(['sitting']);
+  const [batchBgs, setBatchBgs] = useState([]);
+  const [batchJob, setBatchJob] = useState(null);
+  const [batchProgress, setBatchProgress] = useState(null);
 
   useEffect(() => {
     loadOverview();
@@ -177,6 +184,40 @@ export function InventoryPanel() {
     await deleteAsset(type, filename);
     setPreviewAsset(null);
     loadAssets();
+  };
+
+  const handleBatchGenerate = async () => {
+    if (!batchChars.length || !batchPoses.length) return;
+    const total = batchChars.length * batchPoses.length * (batchBgs.length || 1);
+    if (total > 50) {
+      if (!confirm(`This will generate ${total} images. Continue?`)) return;
+    }
+    setBatchProgress({ total, completed: 0, succeeded: 0, failed: 0, running: true });
+    try {
+      const result = await batchGenerate({
+        characters: batchChars,
+        poses: batchPoses,
+        backgrounds: batchBgs.length ? batchBgs : undefined,
+        register_assets: true,
+      });
+      const poll = async () => {
+        const job = await fetchBatchJob(result.jobId);
+        setBatchProgress({ ...job, running: job.completed < job.total });
+        if (job.completed < job.total) {
+          setTimeout(poll, 1000);
+        } else {
+          setStats(await fetchInventoryStats());
+          loadAssets();
+        }
+      };
+      setTimeout(poll, 1500);
+    } catch (e) {
+      setBatchProgress({ error: e.message, running: false });
+    }
+  };
+
+  const toggleBatchItem = (arr, setArr, item) => {
+    setArr(arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item]);
   };
 
   const pendingGaps = gaps.filter(g => g.status === 'pending');
@@ -397,6 +438,72 @@ export function InventoryPanel() {
             </div>
           ) : (
             <p style={styles.dim}>Loading pose options...</p>
+          )}
+
+          {poseOptions && (
+            <div style={styles.card}>
+              <h4 style={styles.cardTitle}>Batch Generate</h4>
+              <p style={{ ...styles.dim, marginBottom: 10 }}>Select multiple characters, poses, and backgrounds to generate all combinations at once.</p>
+
+              <div style={{ marginBottom: 10 }}>
+                <label style={styles.dim}>Characters</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                  {poseOptions.characters.map(c => (
+                    <button key={c} style={{ ...styles.filterBtn, ...(batchChars.includes(c) ? styles.filterBtnActive : {}) }} onClick={() => toggleBatchItem(batchChars, setBatchChars, c)}>{c}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 10 }}>
+                <label style={styles.dim}>Poses</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                  {poseOptions.poses.map(p => (
+                    <button key={p} style={{ ...styles.filterBtn, ...(batchPoses.includes(p) ? styles.filterBtnActive : {}) }} onClick={() => toggleBatchItem(batchPoses, setBatchPoses, p)}>{p}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <label style={styles.dim}>Backgrounds (optional — leave empty for character-only)</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                  {poseOptions.backgrounds.map(b => (
+                    <button key={b} style={{ ...styles.filterBtn, ...(batchBgs.includes(b) ? styles.filterBtnActive : {}) }} onClick={() => toggleBatchItem(batchBgs, setBatchBgs, b)}>{b.replace(/_/g, ' ')}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button
+                  style={{ ...styles.primaryBtn, opacity: batchProgress?.running ? 0.5 : 1 }}
+                  onClick={handleBatchGenerate}
+                  disabled={batchProgress?.running}
+                >
+                  {batchProgress?.running ? 'Generating...' : `Generate ${batchChars.length * batchPoses.length * (batchBgs.length || 1)} images`}
+                </button>
+                {batchProgress && !batchProgress.running && !batchProgress.error && (
+                  <span style={styles.dim}>Done: {batchProgress.succeeded} succeeded, {batchProgress.failed} failed</span>
+                )}
+              </div>
+
+              {batchProgress && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={styles.progressBar}>
+                    <div style={{ ...styles.progressFill, width: `${(batchProgress.completed / batchProgress.total) * 100}%` }} />
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                    <span style={styles.dim}>{batchProgress.completed} / {batchProgress.total}</span>
+                    <span style={styles.dim}>{Math.round((batchProgress.completed / batchProgress.total) * 100)}%</span>
+                  </div>
+                  {batchProgress.errors?.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      {batchProgress.errors.map((e, i) => (
+                        <div key={i} style={{ fontSize: 11, color: '#ef4444' }}>{e.slug}/{e.pose}: {e.error}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -643,4 +750,6 @@ const styles = {
   previewAudio: { padding: 20, textAlign: 'center', marginBottom: 12 },
   previewInfo: { display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 8 },
   previewName: { fontSize: 13, fontWeight: 600, color: '#e4e4ef' },
+  progressBar: { width: '100%', height: 6, background: '#1a1a25', borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', background: '#6366f1', borderRadius: 3, transition: 'width 0.3s ease' },
 };
