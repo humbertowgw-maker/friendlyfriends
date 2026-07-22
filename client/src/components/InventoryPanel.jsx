@@ -505,10 +505,37 @@ export function InventoryPanel() {
               )}
             </div>
           )}
+
+          {poseOptions && (
+            <div style={styles.card}>
+              <h4 style={styles.cardTitle}>Expressions Pack</h4>
+              <p style={{ ...styles.dim, marginBottom: 10 }}>Generate a full expression library for all characters. One click generates happy, sad, excited, scared, and curious expressions for each character.</p>
+
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                {['happy', 'sad', 'excited', 'scared', 'curious'].map(expr => (
+                  <span key={expr} style={styles.exprChip}>{expr}</span>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button
+                  style={{ ...styles.primaryBtn, opacity: batchProgress?.running ? 0.5 : 1 }}
+                  onClick={() => {
+                    setBatchChars(poseOptions.characters);
+                    setBatchPoses(['happy', 'sad', 'excited', 'scared', 'curious']);
+                    setBatchBgs([]);
+                    handleBatchGenerate();
+                  }}
+                  disabled={batchProgress?.running}
+                >
+                  {batchProgress?.running ? 'Generating...' : `Generate ${poseOptions.characters.length * 5} expressions`}
+                </button>
+                <span style={styles.dim}>{poseOptions.characters.length} characters × 5 expressions = {poseOptions.characters.length * 5} images</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
-
-      {tab === 'assets' && (
         <div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
             <span style={styles.dim}>{allAssets?.total || 0} assets</span>
@@ -752,4 +779,5 @@ const styles = {
   previewName: { fontSize: 13, fontWeight: 600, color: '#e4e4ef' },
   progressBar: { width: '100%', height: 6, background: '#1a1a25', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', background: '#6366f1', borderRadius: 3, transition: 'width 0.3s ease' },
+  exprChip: { padding: '4px 10px', background: '#1e3a5f', border: '1px solid #2a2a3a', borderRadius: 6, fontSize: 11, color: '#60a5fa', fontWeight: 600 },
 };
