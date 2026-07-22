@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+
 import {
   fetchEpisodes,
   fetchEpisode,
@@ -224,6 +227,9 @@ export function EpisodePanel() {
               <button style={styles.primaryBtn} onClick={handleFullBuild} disabled={building}>
                 {building ? 'Building...' : 'Full Build'}
               </button>
+              {epDetail.status === 'assembled' && (
+                <a href={`${API_BASE}/episodes/${epDetail.id}/export`} style={styles.exportBtn} download>Download MP4</a>
+              )}
               <button style={styles.secondaryBtn} onClick={() => { setTab('list'); setSelectedEp(null); setEpDetail(null); }}>Back</button>
             </div>
           </div>
@@ -446,6 +452,7 @@ const styles = {
   select: { padding: '6px 10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 6, color: '#e4e4ef', fontSize: 12, marginBottom: 8 },
   primaryBtn: { padding: '6px 14px', background: '#6366f1', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   secondaryBtn: { padding: '6px 14px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 6, color: '#8888a0', fontSize: 12, cursor: 'pointer' },
+  exportBtn: { padding: '6px 14px', background: '#166534', border: 'none', borderRadius: 6, color: '#4ade80', fontSize: 12, fontWeight: 600, cursor: 'pointer', textDecoration: 'none', display: 'inline-block' },
   smallBtn: { padding: '4px 10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 4, color: '#e4e4ef', fontSize: 11, cursor: 'pointer' },
   genBtn: { padding: '4px 10px', background: '#1a1a25', border: '1px solid #2a2a3a', borderRadius: 4, color: '#e4e4ef', fontSize: 11, fontWeight: 600, cursor: 'pointer', minWidth: 32 },
   dangerBtn: { padding: '4px 10px', background: '#1a1a25', border: '1px solid #7f1d1d', borderRadius: 4, color: '#ef4444', fontSize: 11, cursor: 'pointer' },

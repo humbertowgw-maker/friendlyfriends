@@ -5,6 +5,12 @@ import { VideoPipeline } from './video-pipeline.js';
 import { AudioPipeline } from './audio-pipeline.js';
 import { VideoAssembler } from './video-assembler.js';
 import { PromptBuilder } from '../generators/prompt-builder.js';
+import { existsSync, createReadStream } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const VIDEO_DIR = join(__dirname, '..', 'data', 'assets', 'video');
 
 export function createEpisodeRoutes(db, generators, ttsAdapter) {
   const router = Router();
@@ -332,6 +338,35 @@ export function createEpisodeRoutes(db, generators, ttsAdapter) {
 
       episodes.updateEpisode(ep.id, { status: 'built' });
       res.json({ episode: episodes.getEpisode(ep.id), build_log: buildLog });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // --- Export ---
+
+  router.get('/:id/export', (req, res) => {
+    try {
+      const ep = episodes.getEpisode(Number(req.params.id));
+      if (!ep) return res.status(404).json({ error: 'Episode not found' });
+
+      const metadata = typeof ep.metadata === 'string' ? JSON.parse(ep.metadata || '{}') : ep.metadata || {};
+      const finalVideo = metadata.final_video;
+
+      if (!finalVideo) {
+        return res.status(404).json({ error: 'No assembled video. Run Full Build first.' });
+      }
+
+      const videoPath = join(VIDEO_DIR, finalVideo.replace('video/', ''));
+      if (!existsSync(videoPath)) {
+        return res.status(404).json({ error: 'Video file not found on disk' });
+      }
+
+      const filename = `${ep.slug || ep.title.toLowerCase().replace(/\s+/g, '-')}.mp4`;
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'video/mp4');
+      const stream = createReadStream(videoPath);
+      stream.pipe(res);
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
