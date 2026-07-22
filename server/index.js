@@ -9,6 +9,7 @@ import { AlertEngine } from './alert-engine.js';
 import { SmartRouter } from './smart-router.js';
 import { createInventoryRoutes } from './inventory/inventory-routes.js';
 import { CharacterInventory } from './inventory/character-inventory.js';
+import { createGenerators } from './generators/index.js';
 
 const app = express();
 const server = createServer(app);
@@ -62,8 +63,11 @@ for (const char of CHARACTERS) {
   }
 }
 
+// --- Generators ---
+const generators = createGenerators();
+
 // --- Inventory routes ---
-app.use('/api/inventory', createInventoryRoutes(db));
+app.use('/api/inventory', createInventoryRoutes(db, generators));
 
 // --- Provider routes ---
 app.get('/api/providers', (req, res) => {

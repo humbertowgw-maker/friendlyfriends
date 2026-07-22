@@ -161,3 +161,8 @@ export async function processEpisode(episode) {
   });
   return res.json();
 }
+
+export async function fetchGeneratorStatus() {
+  const res = await fetch(`${API_BASE}/inventory/generators/status`);
+  return res.json();
+}

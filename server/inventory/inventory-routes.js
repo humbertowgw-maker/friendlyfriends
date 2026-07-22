@@ -4,12 +4,12 @@ import { PipelineHook } from './pipeline-hook.js';
 import { BookIngestion } from './book-ingestion.js';
 import { VideoPipeline } from './video-pipeline.js';
 
-export function createInventoryRoutes(db) {
+export function createInventoryRoutes(db, generators) {
   const router = Router();
   const inventory = new CharacterInventory(db);
   const pipeline = new PipelineHook(inventory);
   const ingestion = new BookIngestion(db, inventory);
-  const videoPipeline = new VideoPipeline(inventory);
+  const videoPipeline = new VideoPipeline(inventory, generators);
   videoPipeline.setHook(pipeline);
 
   // --- Characters ---
@@ -186,10 +186,10 @@ export function createInventoryRoutes(db) {
       if (!actions || !Array.isArray(actions) || actions.length === 0) {
         return res.status(400).json({ error: 'actions array is required' });
       }
-      const generateFn = async (charId, label, type) => {
-        const gen = PipelineHook.stubGenerator(label, type);
-        return await gen();
-      };
+      // Use real generators if available, otherwise stub
+      const generateFn = generators
+        ? async (slug, label, type) => await generators.generate({ character_slug: slug, action_label: label, asset_type: type })
+        : async (slug, label, type) => await VideoPipeline.stubGenerator(label, type)();
       const result = await videoPipeline.generateScene({ title: title || 'Untitled Scene', actions }, generateFn);
       res.json(result);
     } catch (e) {
@@ -203,12 +203,23 @@ export function createInventoryRoutes(db) {
       if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
         return res.status(400).json({ error: 'scenes array is required' });
       }
-      const generateFn = async (charId, label, type) => {
-        const gen = PipelineHook.stubGenerator(label, type);
-        return await gen();
-      };
+      const generateFn = generators
+        ? async (slug, label, type) => await generators.generate({ character_slug: slug, action_label: label, asset_type: type })
+        : async (slug, label, type) => await VideoPipeline.stubGenerator(label, type)();
       const result = await videoPipeline.processEpisode({ title: title || 'Untitled Episode', scenes }, generateFn);
       res.json(result);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // --- Generators ---
+
+  router.get('/generators/status', async (req, res) => {
+    try {
+      if (!generators) return res.json({ configured: false, adapters: [] });
+      const status = await generators.getStatus();
+      res.json({ configured: true, adapters: status, stats: generators.getStats(), history: generators.getHistory(20) });
     } catch (e) {
       res.status(500).json({ error: e.message });
     }
