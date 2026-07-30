@@ -239,6 +239,65 @@ export async function initDb() {
       FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS brain_docs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL DEFAULT '',
+      content TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'text',
+      tags TEXT DEFAULT '',
+      pinned INTEGER DEFAULT 0,
+      owner_id TEXT NOT NULL DEFAULT 'default',
+      permission TEXT NOT NULL DEFAULT 'private', -- 'private' | 'shared' | 'public'
+      created_at DATETIME DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS reminders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      message TEXT NOT NULL,
+      due_at TEXT NOT NULL,
+      recurrence TEXT DEFAULT '',
+      done INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS brain_embeddings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      doc_id INTEGER NOT NULL UNIQUE,
+      embedding TEXT NOT NULL,
+      updated_at DATETIME DEFAULT (datetime('now')),
+      FOREIGN KEY (doc_id) REFERENCES brain_docs(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS notion_integrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      access_token TEXT NOT NULL,
+      workspace_id TEXT,
+      workspace_name TEXT,
+      bot_id TEXT,
+      expires_at INTEGER,
+      created_at DATETIME DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS notion_page_mappings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      brain_doc_id INTEGER NOT NULL,
+      notion_page_id TEXT NOT NULL,
+      synced_at DATETIME DEFAULT (datetime('now')),
+      FOREIGN KEY (brain_doc_id) REFERENCES brain_docs(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS obsidian_vaults (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      vault_path TEXT NOT NULL,
+      vault_name TEXT,
+      sync_enabled INTEGER DEFAULT 1,
+      last_synced DATETIME,
+      created_at DATETIME DEFAULT (datetime('now'))
+    );
+
     CREATE TABLE IF NOT EXISTS episode_approvals (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       episode_id INTEGER NOT NULL,

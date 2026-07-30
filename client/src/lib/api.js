@@ -1,4 +1,5 @@
 const API_BASE = '/api';
+export { API_BASE as api };
 
 export async function fetchProviders() {
   const res = await fetch(`${API_BASE}/providers`);

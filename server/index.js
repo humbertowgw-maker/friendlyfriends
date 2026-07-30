@@ -12,6 +12,11 @@ import { CharacterInventory } from './inventory/character-inventory.js';
 import { createGenerators } from './generators/index.js';
 import { EdgeTTSAdapter } from './generators/edge-tts-adapter.js';
 import { createEpisodeRoutes } from './inventory/episode-routes.js';
+import { FleetManager } from './fleet/fleet-manager.js';
+import { WorkerNode } from './fleet/worker-node.js';
+import { TaskQueue } from './fleet/task-queue.js';
+import { createFleetRoutes } from './fleet/fleet-routes.js';
+import { createWgwRoutes } from './wgw-routes.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -29,12 +34,31 @@ app.use('/assets', express.static(join(__dirname, 'data', 'assets')));
 // --- SSE clients ---
 const sseClients = new Set();
 
+// --- Presence tracking ---
+const presenceMap = new Map(); // userId -> {userId, userName, petIdx, lastSeen, deviceId}
+const PRESENCE_TTL = 30000; // 30s
+
 function broadcast(event, data) {
   const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of sseClients) {
     res.write(msg);
   }
 }
+
+function broadcastPresence() {
+  const now = Date.now();
+  const active = [];
+  for (const [userId, p] of presenceMap) {
+    if (now - p.lastSeen < PRESENCE_TTL) {
+      active.push(p);
+    } else {
+      presenceMap.delete(userId);
+    }
+  }
+  broadcast('presence', { users: active });
+}
+
+setInterval(broadcastPresence, 5000);
 
 app.get('/api/events', (req, res) => {
   res.writeHead(200, {
@@ -45,6 +69,14 @@ app.get('/api/events', (req, res) => {
   res.write(':\n\n');
   sseClients.add(res);
   req.on('close', () => sseClients.delete(res));
+});
+
+app.post('/api/presence', (req, res) => {
+  const { userId, userName, petIdx, deviceId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  presenceMap.set(userId, { userId, userName: userName || 'Anonymous', petIdx: petIdx || 0, lastSeen: Date.now(), deviceId: deviceId || 'unknown' });
+  broadcastPresence();
+  res.json({ ok: true });
 });
 
 // --- Init ---
@@ -76,9 +108,19 @@ for (const char of CHARACTERS) {
 const generators = createGenerators();
 const tts = new EdgeTTSAdapter();
 
+// --- Fleet Management ---
+const fleetManager = new FleetManager(db, broadcast);
+const workerNode = new WorkerNode(fleetManager, {
+  port: process.env.PORT || 3001,
+  capabilities: ['video-generation', 'tts', 'image-gen'],
+});
+const taskQueue = new TaskQueue(fleetManager);
+
 // --- Routes ---
 app.use('/api/inventory', createInventoryRoutes(db, generators));
 app.use('/api/episodes', createEpisodeRoutes(db, generators, tts));
+app.use('/api/fleet', createFleetRoutes(fleetManager, workerNode));
+app.use('/api', createWgwRoutes(db));
 
 // --- Provider routes ---
 app.get('/api/providers', (req, res) => {
@@ -262,7 +304,9 @@ function startPolling() {
 
 // --- Start ---
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`AI Rate Gauge server running on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', async () => {
+  console.log(`AI Rate Gauge server running on http://0.0.0.0:${PORT}`);
+  await workerNode.start();
+  taskQueue.startPolling();
   startPolling();
 });

@@ -9,6 +9,9 @@ import { Predictions } from './components/Predictions.jsx';
 import { ProviderSetup } from './components/ProviderSetup.jsx';
 import { InventoryPanel } from './components/InventoryPanel.jsx';
 import { EpisodePanel } from './components/EpisodePanel.jsx';
+import { FleetPanel } from './components/FleetPanel.jsx';
+import { SophiaTab } from './components/SophiaTab.jsx';
+import { FloatingPet } from './components/FloatingPet.jsx';
 
 export default function App() {
   const [dashboard, setDashboard] = useState(null);
@@ -57,7 +60,7 @@ export default function App() {
           <p style={styles.subtitle}>Self-aware cost & rate limit monitoring</p>
         </div>
         <div style={styles.tabs}>
-          {['overview', 'costs', 'routing', 'alerts', 'inventory', 'episodes'].map(t => (
+          {['overview', 'costs', 'routing', 'alerts', 'inventory', 'episodes', 'fleet', 'sophia'].map(t => (
             <button
               key={t}
               style={{ ...styles.tab, ...(tab === t ? styles.tabActive : {}) }}
@@ -163,6 +166,20 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {tab === 'fleet' && (
+        <div style={styles.grid}>
+          <div style={{ ...styles.card, gridColumn: '1 / -1' }}>
+            <FleetPanel />
+          </div>
+        </div>
+      )}
+
+      {tab === 'sophia' && (
+        <SophiaTab />
+      )}
+
+      <FloatingPet />
     </div>
   );
 }
