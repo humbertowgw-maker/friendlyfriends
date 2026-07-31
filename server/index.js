@@ -12,10 +12,6 @@ import { CharacterInventory } from './inventory/character-inventory.js';
 import { createGenerators } from './generators/index.js';
 import { EdgeTTSAdapter } from './generators/edge-tts-adapter.js';
 import { createEpisodeRoutes } from './inventory/episode-routes.js';
-import { FleetManager } from './fleet/fleet-manager.js';
-import { WorkerNode } from './fleet/worker-node.js';
-import { TaskQueue } from './fleet/task-queue.js';
-import { createFleetRoutes } from './fleet/fleet-routes.js';
 import { createWgwRoutes } from './wgw-routes.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -125,14 +121,6 @@ for (const char of CHARACTERS) {
 const generators = createGenerators();
 const tts = new EdgeTTSAdapter();
 
-// --- Fleet Management ---
-const fleetManager = new FleetManager(db, broadcast);
-const workerNode = new WorkerNode(fleetManager, {
-  port: process.env.PORT || 3001,
-  capabilities: ['video-generation', 'tts', 'image-gen'],
-});
-const taskQueue = new TaskQueue(fleetManager);
-
 // --- Health check ---
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: Date.now(), uptime: process.uptime() });
@@ -141,7 +129,6 @@ const taskQueue = new TaskQueue(fleetManager);
   // --- Routes ---
 app.use('/api/inventory', createInventoryRoutes(db, generators));
 app.use('/api/episodes', createEpisodeRoutes(db, generators, tts));
-app.use('/api/fleet', createFleetRoutes(fleetManager, workerNode));
 app.use('/api', createWgwRoutes(db));
 
 // --- Obsidian Watcher routes ---

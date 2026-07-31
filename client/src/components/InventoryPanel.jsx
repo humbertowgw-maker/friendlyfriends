@@ -575,6 +575,8 @@ export function InventoryPanel() {
           )}
         </div>
       )}
+
+      {tab === 'assets' && (
         <div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
             <span style={styles.dim}>{allAssets?.total || 0} assets</span>
@@ -806,9 +808,6 @@ const styles = {
   card: { background: '#12121a', border: '1px solid #2a2a3a', borderRadius: 12, padding: 20, marginBottom: 12 },
   cardTitle: { fontSize: 13, fontWeight: 600, marginBottom: 10, color: '#e4e4ef' },
   dim: { color: '#8888a0', fontSize: 12 },
-  breakdownRow: { display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #1a1a25', fontSize: 12 },
-  breakdownType: { color: '#e4e4ef', textTransform: 'capitalize' },
-  breakdownCount: { color: '#8888a0', fontWeight: 600 },
   charLayout: { display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16 },
   charList: { display: 'flex', flexDirection: 'column', gap: 4 },
   charItem: { padding: '10px 12px', background: '#12121a', border: '1px solid #2a2a3a', borderRadius: 8, cursor: 'pointer' },
