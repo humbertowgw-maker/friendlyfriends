@@ -1,8 +1,25 @@
 import ws from 'ws';
+import http from 'http';
 import * as Y from 'yjs';
 
+const server = http.createServer((req, res) => {
+  if (req.url === '/health') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 'ok', service: 'yjs', timestamp: Date.now() }));
+    return;
+  }
+  res.writeHead(404);
+  res.end();
+});
+
 const WebSocketServer = ws.Server;
-const wss = new WebSocketServer({ port: 1234 });
+const wss = new WebSocketServer({ server });
+const PORT = process.env.PORT || 1234;
+
+server.listen(PORT, () => {
+  console.log(`Yjs WebSocket server running on ws://localhost:${PORT}`);
+  console.log(`Health check available at http://localhost:${PORT}/health`);
+});
 
 const docs = new Map();
 

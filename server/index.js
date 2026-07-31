@@ -133,7 +133,12 @@ const workerNode = new WorkerNode(fleetManager, {
 });
 const taskQueue = new TaskQueue(fleetManager);
 
-// --- Routes ---
+// --- Health check ---
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: Date.now(), uptime: process.uptime() });
+  });
+
+  // --- Routes ---
 app.use('/api/inventory', createInventoryRoutes(db, generators));
 app.use('/api/episodes', createEpisodeRoutes(db, generators, tts));
 app.use('/api/fleet', createFleetRoutes(fleetManager, workerNode));

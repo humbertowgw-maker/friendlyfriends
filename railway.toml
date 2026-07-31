@@ -1,0 +1,21 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd client && npm run build"
+
+[deploy]
+startCommand = "npm run server"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[[services]]
+name = "web"
+source = "."
+
+[[services]]
+name = "yjs"
+source = "."
+startCommand = "node server/yjs-server.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 60
