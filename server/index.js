@@ -19,6 +19,7 @@ import { createFleetRoutes } from './fleet/fleet-routes.js';
 import { createWgwRoutes } from './wgw-routes.js';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { ObsidianWatcher } from './obsidian-watcher.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -87,6 +88,22 @@ const predictor = new UsagePredictor(db);
 const alerts = new AlertEngine(db, broadcast);
 const router = new SmartRouter(db, optimizer);
 
+// --- Obsidian Watcher ---
+const obsidianWatcher = new ObsidianWatcher(db);
+app.set('obsidianWatcher', obsidianWatcher);
+
+// Start watching for vaults with auto_watch = 1
+setTimeout(async () => {
+  try {
+    const vaults = db.prepare('SELECT * FROM obsidian_vaults WHERE auto_watch = 1').all();
+    for (const vault of vaults) {
+      try {
+        await obsidianWatcher.startWatching(vault.user_id, vault.vault_path);
+      } catch (e) { console.error('Auto-watch failed for', vault.vault_path, e); }
+    }
+  } catch (e) { console.error('Auto-watch startup error:', e); }
+}, 1000);
+
 // --- Seed character roster ---
 const inventory = new CharacterInventory(db);
 const CHARACTERS = [
@@ -121,6 +138,27 @@ app.use('/api/inventory', createInventoryRoutes(db, generators));
 app.use('/api/episodes', createEpisodeRoutes(db, generators, tts));
 app.use('/api/fleet', createFleetRoutes(fleetManager, workerNode));
 app.use('/api', createWgwRoutes(db));
+
+// --- Obsidian Watcher routes ---
+app.post('/api/obsidian/watch/start', async (req, res) => {
+  const { userId, vaultPath } = req.body;
+  if (!vaultPath) return res.status(400).json({ error: 'vaultPath required' });
+  try {
+    await obsidianWatcher.startWatching(userId || 'default', vaultPath);
+    res.json({ ok: true, watching: vaultPath });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/obsidian/watch/stop', (req, res) => {
+  const { userId } = req.body;
+  obsidianWatcher.stopWatching(userId || 'default');
+  res.json({ ok: true });
+});
+
+app.get('/api/obsidian/watch/status', (req, res) => {
+  const { userId } = req.query;
+  res.json(obsidianWatcher.getStatus(userId || 'default'));
+});
 
 // --- Provider routes ---
 app.get('/api/providers', (req, res) => {

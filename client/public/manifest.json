@@ -1,0 +1,45 @@
+{
+  "name": "Sophia - Second Brain",
+  "short_name": "Sophia",
+  "description": "Your autonomous AI companion and second brain",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#6366f1",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Chat",
+      "short_name": "Chat",
+      "description": "Open chat with Sophia",
+      "url": "/?tab=chat",
+      "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>" }]
+    },
+    {
+      "name": "Brain",
+      "short_name": "Brain",
+      "description": "Open brain store",
+      "url": "/?tab=brain",
+      "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>" }]
+    },
+    {
+      "name": "Reminders",
+      "short_name": "Remind",
+      "description": "View reminders",
+      "url": "/?tab=reminders",
+      "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⏰</text></svg>" }]
+    }
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
+}

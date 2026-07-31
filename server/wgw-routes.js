@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 
 const SOPHIA_SYSTEM_PROMPT = `You are Sophia, a friendly AI companion and "second brain" for WGW (WhiteGlove) BrainOS. You are helpful, warm, and concise. You help manage tasks, answer questions, summarize information, and keep track of things. You have a slight playful personality — you're like a knowledgeable pet friend who lives on the screen. Keep responses under 150 words unless asked for detail. You can discuss: task planning, AI model recommendations, cost optimization, code, creative ideas, and general knowledge.`;
 
@@ -314,11 +315,116 @@ export function createWgwRoutes(db) {
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
+  // --- Document Version History ---
+  router.get('/pet/brain/:id/versions', (req, res) => {
+    const userId = getUserId(req);
+    try {
+      const doc = db.prepare('SELECT * FROM brain_docs WHERE id = ?').get(req.params.id);
+      if (!doc) return res.status(404).json({ error: 'Not found' });
+      if (doc.owner_id !== userId && doc.permission === 'private') return res.status(403).json({ error: 'Forbidden' });
+      const versions = db.prepare('SELECT id, content_preview, created_at FROM doc_versions WHERE brain_doc_id = ? ORDER BY created_at DESC LIMIT 50').all(req.params.id);
+      res.json(versions);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  router.post('/pet/brain/:id/versions', (req, res) => {
+    const userId = getUserId(req);
+    const { yjs_update, content_preview } = req.body;
+    if (!yjs_update) return res.status(400).json({ error: 'yjs_update required' });
+    try {
+      const doc = db.prepare('SELECT * FROM brain_docs WHERE id = ?').get(req.params.id);
+      if (!doc) return res.status(404).json({ error: 'Not found' });
+      if (doc.owner_id !== userId && doc.permission === 'private') return res.status(403).json({ error: 'Forbidden' });
+      const r = db.prepare('INSERT INTO doc_versions (brain_doc_id, user_id, yjs_update, content_preview) VALUES (?, ?, ?, ?)')
+        .run(req.params.id, userId, yjs_update, content_preview || '');
+      res.json({ ok: true, id: r.lastInsertRowid });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  router.post('/pet/brain/:id/versions/:versionId/restore', (req, res) => {
+    const userId = getUserId(req);
+    try {
+      const doc = db.prepare('SELECT * FROM brain_docs WHERE id = ?').get(req.params.id);
+      if (!doc) return res.status(404).json({ error: 'Not found' });
+      if (doc.owner_id !== userId && doc.permission === 'private') return res.status(403).json({ error: 'Forbidden' });
+      const version = db.prepare('SELECT * FROM doc_versions WHERE id = ? AND brain_doc_id = ?').get(req.params.versionId, req.params.id);
+      if (!version) return res.status(404).json({ error: 'Version not found' });
+      // The client will apply the Yjs update, we just return it
+      res.json({ ok: true, yjs_update: version.yjs_update });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
   // --- Notion Integration ---
   router.get('/pet/notion/status', (req, res) => {
     try {
       const row = db.prepare('SELECT * FROM notion_integrations WHERE user_id = ?').get(req.headers['x-user-id'] || 'default');
-      res.json({ connected: !!row, workspace: row?.workspace_name || null });
+      res.json({ connected: !!row, workspace: row?.workspace_name || null, hasOAuth: !!row?.client_id });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // OAuth2: Generate authorization URL
+  router.get('/pet/notion/oauth/url', (req, res) => {
+    try {
+      const row = db.prepare('SELECT * FROM notion_integrations WHERE user_id = ?').get(req.headers['x-user-id'] || 'default');
+      if (!row?.client_id) return res.status(400).json({ error: 'OAuth client not configured' });
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/pet/notion/oauth/callback`;
+      const state = crypto.randomUUID();
+      const scope = 'read write';
+      const url = `https://api.notion.com/v1/oauth/authorize?client_id=${row.client_id}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`;
+      res.json({ url, state });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // OAuth2: POST to generate auth URL (for popup)
+  router.post('/pet/notion/oauth/authorize', (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'] || 'default';
+      const row = db.prepare('SELECT * FROM notion_integrations WHERE user_id = ?').get(userId);
+      if (!row?.client_id) return res.status(400).json({ error: 'OAuth client not configured' });
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/pet/notion/oauth/callback`;
+      const state = crypto.randomUUID();
+      const scope = 'read write';
+      const url = `https://api.notion.com/v1/oauth/authorize?client_id=${row.client_id}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`;
+      res.json({ url, state });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // OAuth2: Callback - exchange code for tokens
+  router.get('/pet/notion/oauth/callback', async (req, res) => {
+    const { code, state, error } = req.query;
+    const userId = req.headers['x-user-id'] || 'default';
+    if (error) return res.redirect(`/?notion_error=${encodeURIComponent(error)}`);
+    if (!code) return res.status(400).send('Missing code');
+    try {
+      const row = db.prepare('SELECT * FROM notion_integrations WHERE user_id = ?').get(userId);
+      if (!row?.client_id || !row?.client_secret) return res.status(400).send('OAuth not configured');
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/pet/notion/oauth/callback`;
+      const tokenResp = await fetch('https://api.notion.com/v1/oauth/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${Buffer.from(`${row.client_id}:${row.client_secret}`).toString('base64')}` },
+        body: JSON.stringify({ grant_type: 'authorization_code', code, redirect_uri: redirectUri })
+      });
+      const tokens = await tokenResp.json();
+      if (!tokenResp.ok) throw new Error(tokens.error_description || 'Token exchange failed');
+      const expiresAt = Date.now() + (tokens.expires_in || 3600) * 1000;
+      db.prepare('INSERT OR REPLACE INTO notion_integrations (user_id, client_id, client_secret, access_token, refresh_token, workspace_id, workspace_name, bot_id, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(userId, row.client_id, row.client_secret, tokens.access_token, tokens.refresh_token, tokens.workspace_id, tokens.workspace_name, tokens.bot_id, expiresAt);
+      res.redirect('/?notion_connected=1');
+    } catch (err) {
+      console.error('Notion OAuth error:', err);
+      res.redirect(`/?notion_error=${encodeURIComponent(err.message)}`);
+    }
+  });
+
+  // OAuth2: Save client credentials (admin step)
+  router.post('/pet/notion/oauth/configure', (req, res) => {
+    const { client_id, client_secret } = req.body;
+    if (!client_id || !client_secret) return res.status(400).json({ error: 'client_id and client_secret required' });
+    try {
+      const userId = req.headers['x-user-id'] || 'default';
+      db.prepare('INSERT OR REPLACE INTO notion_integrations (user_id, client_id, client_secret) VALUES (?, ?, ?)')
+        .run(userId, client_id, client_secret);
+      res.json({ ok: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
   });
 
@@ -550,6 +656,33 @@ created: ${doc.created_at}
       db.prepare('UPDATE obsidian_vaults SET last_synced = datetime(\'now\') WHERE user_id = ?').run(userId);
       res.json({ ok: true, synced, errors, total: docs.length });
     } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  // --- Obsidian Watcher ---
+  router.post('/pet/obsidian/watch/start', (req, res) => {
+    const userId = req.headers['x-user-id'] || 'default';
+    const { vault_id } = req.body;
+    try {
+      const vault = db.prepare('SELECT * FROM obsidian_vaults WHERE id = ? AND user_id = ?').get(vault_id, userId);
+      if (!vault) return res.status(404).json({ error: 'Vault not found' });
+      req.app.get('obsidianWatcher').startWatching(userId, vault.vault_path);
+      db.prepare('UPDATE obsidian_vaults SET auto_watch = 1 WHERE id = ?').run(vault_id);
+      res.json({ ok: true, status: req.app.get('obsidianWatcher').getStatus(userId) });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  router.post('/pet/obsidian/watch/stop', (req, res) => {
+    const userId = req.headers['x-user-id'] || 'default';
+    try {
+      req.app.get('obsidianWatcher').stopWatching(userId);
+      db.prepare('UPDATE obsidian_vaults SET auto_watch = 0 WHERE user_id = ?').run(userId);
+      res.json({ ok: true, status: req.app.get('obsidianWatcher').getStatus(userId) });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+  });
+
+  router.get('/pet/obsidian/watch/status', (req, res) => {
+    const userId = req.headers['x-user-id'] || 'default';
+    res.json(req.app.get('obsidianWatcher').getStatus(userId));
   });
 
   // --- Reminders ---

@@ -271,7 +271,12 @@ export async function initDb() {
     CREATE TABLE IF NOT EXISTS notion_integrations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id TEXT NOT NULL,
-      access_token TEXT NOT NULL,
+      -- OAuth2 credentials
+      client_id TEXT,
+      client_secret TEXT,
+      -- Token data
+      access_token TEXT,
+      refresh_token TEXT,
       workspace_id TEXT,
       workspace_name TEXT,
       bot_id TEXT,
@@ -294,8 +299,29 @@ export async function initDb() {
       vault_path TEXT NOT NULL,
       vault_name TEXT,
       sync_enabled INTEGER DEFAULT 1,
+      auto_watch INTEGER DEFAULT 0,
       last_synced DATETIME,
       created_at DATETIME DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS obsidian_file_mappings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      vault_id INTEGER NOT NULL,
+      brain_doc_id INTEGER NOT NULL,
+      file_path TEXT NOT NULL,
+      synced_at DATETIME DEFAULT (datetime('now')),
+      FOREIGN KEY (brain_doc_id) REFERENCES brain_docs(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS doc_versions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      brain_doc_id INTEGER NOT NULL,
+      user_id TEXT NOT NULL,
+      yjs_update BLOB NOT NULL,
+      content_preview TEXT,
+      created_at DATETIME DEFAULT (datetime('now')),
+      FOREIGN KEY (brain_doc_id) REFERENCES brain_docs(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS episode_approvals (

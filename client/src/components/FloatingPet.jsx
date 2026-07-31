@@ -4,11 +4,21 @@ import { WebsocketProvider } from 'y-websocket';
 
 const YJS_URL = 'ws://localhost:1234';
 
-function CollabEditor({docId, initialContent, onSave, onCancel}){
+function CollabEditor({docId, initialContent, userName, onSave, onCancel}){
   const textareaRef=useRef(null);
+  const mirrorRef=useRef(null);
   const providerRef=useRef(null);
   const ydocRef=useRef(null);
+  const awarenessRef=useRef(null);
   const connected=useRef(false);
+  const remoteUsers=useRef(new Map());
+  const [remoteCursors,setRemoteCursors]=useState([]);
+  const [versions,setVersions]=useState([]);
+  const [showVersions,setShowVersions]=useState(false);
+  const [savingVersion,setSavingVersion]=useState(false);
+  const userColorRef=useRef(`hsl(${Math.random()*360},70%,50%)`);
+  const userNameRef=useRef(userName||'Anonymous');
+  useEffect(()=>{userNameRef.current=userName||'Anonymous'},[userName]);
 
   useEffect(()=>{
     const ydoc=new Y.Doc();
@@ -19,6 +29,27 @@ function CollabEditor({docId, initialContent, onSave, onCancel}){
     const provider=new WebsocketProvider(YJS_URL,`brain-${docId}`,ydoc);
     providerRef.current=provider;
 
+    // Awareness for remote cursors
+    const awareness=provider.awareness;
+    awarenessRef.current=awareness;
+    awareness.setLocalStateField('user',{
+      name:userNameRef.current,
+      color:userColorRef.current,
+      cursor:null,
+      selection:null
+    });
+
+    awareness.on('change',()=>{
+      const states=awareness.getStates();
+      const cursors=[];
+      states.forEach((state,clientID)=>{
+        if(clientID!==awareness.clientID && state.user){
+          cursors.push({clientID,...state.user});
+        }
+      });
+      setRemoteCursors(cursors);
+    });
+
     provider.on('status',event=>{connected.current=event.status==='connected'});
 
     const textarea=textareaRef.current;
@@ -26,24 +57,186 @@ function CollabEditor({docId, initialContent, onSave, onCancel}){
       textarea.value=ytext.toString();
       const observer=()=>{if(textarea.value!==ytext.toString())textarea.value=ytext.toString()};
       ytext.observe(observer);
-      textarea.addEventListener('input',()=>{ydoc.transact(()=>{ytext.delete(0,ytext.length);ytext.insert(0,textarea.value)})});
-      return ()=>{ytext.unobserve(observer);provider.destroy();ydoc.destroy()};
+      
+      // Track cursor/selection position
+      const updateAwareness=()=>{
+        const start=textarea.selectionStart;
+        const end=textarea.selectionEnd;
+        awareness.setLocalStateField('user',{
+          name:userNameRef.current,
+          color:userColorRef.current,
+          cursor:start,
+          selection:start!==end?{start,end}:null
+        });
+      };
+      textarea.addEventListener('input',()=>{
+        ydoc.transact(()=>{ytext.delete(0,ytext.length);ytext.insert(0,textarea.value)});
+        updateAwareness();
+      });
+      textarea.addEventListener('keyup',updateAwareness);
+      textarea.addEventListener('click',updateAwareness);
+      textarea.addEventListener('select',updateAwareness);
+      
+      return ()=>{
+        ytext.unobserve(observer);
+        textarea.removeEventListener('input',updateAwareness);
+        textarea.removeEventListener('keyup',updateAwareness);
+        textarea.removeEventListener('click',updateAwareness);
+        textarea.removeEventListener('select',updateAwareness);
+        provider.destroy();ydoc.destroy()
+      };
     }
-  },[docId,initialContent]);
+  },[docId,initialContent,userName]);
 
-  const handleSave=()=>{
+  // Save version snapshot
+  const saveVersion=useCallback(async()=>{
+    if(!ydocRef.current) return;
+    setSavingVersion(true);
+    try{
+      const ydoc=ydocRef.current;
+      const ytext=ydoc.getText('content');
+      const content=ytext.toString();
+      const update=Y.encodeStateAsUpdate(ydoc);
+      // Convert Uint8Array to base64 for storage
+      const updateB64=btoa(String.fromCharCode(...update));
+      const preview=content.slice(0,100);
+      const r=await fetch(`${API}/pet/brain/${docId}/versions`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-user-id':userId},
+        body:JSON.stringify({yjs_update:updateB64,content_preview:preview})
+      });
+      const d=await r.json();
+      if(d.ok){
+        // Refresh versions list
+        const v=await fetch(`${API}/pet/brain/${docId}/versions`,{headers:{'x-user-id':userId}}).then(r=>r.json());
+        setVersions(v);
+      }
+    }catch(e){console.error('Save version failed:',e)}
+    finally{setSavingVersion(false)}
+  },[docId]);
+
+  // Load version history
+  const loadVersions=useCallback(async()=>{
+    try{
+      const v=await fetch(`${API}/pet/brain/${docId}/versions`,{headers:{'x-user-id':userId}}).then(r=>r.json());
+      setVersions(v);
+    }catch(e){}
+  },[docId]);
+
+  useEffect(()=>{loadVersions()},[loadVersions]);
+
+  // Periodic auto-save version (every 60 seconds)
+  useEffect(()=>{
+    const interval=setInterval(saveVersion,60000);
+    return ()=>clearInterval(interval);
+  },[saveVersion]);
+
+  // Save version on manual save
+  const handleSave=async()=>{
     const content=ydocRef.current?.getText('content').toString()||'';
+    await saveVersion();
     onSave(content);
   };
 
+  // Restore a version
+  const restoreVersion=async(versionId)=>{
+    try{
+      const r=await fetch(`${API}/pet/brain/${docId}/versions/${versionId}/restore`,{
+        method:'POST',headers:{'Content-Type':'application/json','x-user-id':userId}
+      });
+      const d=await r.json();
+      if(d.ok && d.yjs_update){
+        const ydoc=ydocRef.current;
+        if(ydoc){
+          // Decode base64 back to Uint8Array
+          const update=new Uint8Array(atob(d.yjs_update).split('').map(c=>c.charCodeAt(0)));
+          Y.applyUpdate(ydoc,update);
+          // Refresh content
+          const textarea=textareaRef.current;
+          if(textarea){
+            const ytext=ydoc.getText('content');
+            textarea.value=ytext.toString();
+          }
+          await saveVersion();
+        }
+      }
+    }catch(e){console.error('Restore failed:',e)}
+  };
+
+  // Render remote cursors overlay
+  const renderRemoteCursors=()=>{
+    if(!textareaRef.current) return null;
+    const textarea=textareaRef.current;
+    const rect=textarea.getBoundingClientRect();
+    const lineHeight=18; // approximate
+    const paddingLeft=8;
+    const paddingTop=6;
+    const charWidth=8.4; // monospace approx
+    
+    return remoteCursors.map(u=>{
+      if(u.cursor===null) return null;
+      const pos=u.cursor;
+      // Approximate x,y from cursor position
+      const lines=textarea.value.substring(0,pos).split('\n');
+      const line=lines.length-1;
+      const col=lines[lines.length-1].length;
+      const x=rect.left+paddingLeft+col*charWidth;
+      const y=rect.top+paddingTop+line*lineHeight;
+      
+      return (
+        <div key={u.clientID} style={{
+          position:'fixed',left:x,top:y,pointerEvents:'none',zIndex:1000,
+          display:'flex',flexDirection:'column',alignItems:'center'
+        }}>
+          <div style={{
+            width:2,height:lineHeight,background:u.color,
+            animation:'blink 1s infinite'
+          }}/>
+          <span style={{
+            background:u.color,color:'#fff',fontSize:9,padding:'1px 4px',
+            borderRadius:3,whiteSpace:'nowrap',marginTop:1,transform:'translateX(-50%)',left:'50%',position:'relative'
+          }}>{u.name}</span>
+        </div>
+      );
+    });
+  };
+
   return (
-    <div style={{display:'flex',flexDirection:'column',gap:4}}>
-      <textarea ref={textareaRef} style={{width:'100%',minHeight:80,padding:'6px 8px',borderRadius:4,border:'1px solid var(--accent)',background:'#12121a',color:'var(--text)',fontSize:10,outline:'none',resize:'vertical',fontFamily:'monospace'}} spellCheck={false}/>
-      <div style={{display:'flex',gap:4,justifyContent:'flex-end'}}>
-        <span style={{fontSize:10,color:connected.current?'#22c55e':'#f97316',alignSelf:'center'}}>{connected.current?'🟢 Synced':'🟡 Connecting...'}</span>
-        <button onClick={handleSave} style={{padding:'4px 8px',borderRadius:4,border:'none',background:'var(--accent)',color:'#fff',fontSize:10,cursor:'pointer'}}>Save</button>
-        <button onClick={onCancel} style={{padding:'4px 8px',borderRadius:4,border:'none',background:'#2a2a3a',color:'var(--text)',fontSize:10,cursor:'pointer'}}>Cancel</button>
+    <div style={{display:'flex',flexDirection:'column',gap:4,position:'relative'}}>
+      <div style={{position:'relative'}}>
+        <textarea ref={textareaRef} style={{width:'100%',minHeight:80,padding:'6px 8px',borderRadius:4,border:'1px solid var(--accent)',background:'#12121a',color:'var(--text)',fontSize:10,outline:'none',resize:'vertical',fontFamily:'monospace'}} spellCheck={false}/>
+        {renderRemoteCursors()}
       </div>
+      <div style={{display:'flex',gap:4,justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{display:'flex',gap:4,alignItems:'center'}}>
+          <span style={{fontSize:10,color:connected.current?'#22c55e':'#f97316',alignSelf:'center'}}>{connected.current?'🟢 Synced':'🟡 Connecting...'}</span>
+          <button onClick={()=>{setShowVersions(!showVersions);if(!showVersions)loadVersions()}} style={{padding:'4px 8px',borderRadius:4,border:'none',background:showVersions?'var(--accent)':'#2a2a3a',color:showVersions?'#fff':'var(--text)',fontSize:10,cursor:'pointer'}}>{showVersions?'📜 Hide History':'📜 History'}</button>
+          <button onClick={saveVersion} disabled={savingVersion} style={{padding:'4px 8px',borderRadius:4,border:'none',background:'#2a2a3a',color:'var(--text)',fontSize:10,cursor:'pointer'}}>{savingVersion?'⏳':'💾 Snapshot'}</button>
+        </div>
+        <div style={{display:'flex',gap:4}}>
+          <button onClick={handleSave} style={{padding:'4px 8px',borderRadius:4,border:'none',background:'var(--accent)',color:'#fff',fontSize:10,cursor:'pointer'}}>Save</button>
+          <button onClick={onCancel} style={{padding:'4px 8px',borderRadius:4,border:'none',background:'#2a2a3a',color:'var(--text)',fontSize:10,cursor:'pointer'}}>Cancel</button>
+        </div>
+      </div>
+      {showVersions&&(
+        <div style={{marginTop:8,maxHeight:200,overflowY:'auto',borderTop:'1px solid var(--border)',paddingTop:8}}>
+          <div style={{fontSize:10,color:'var(--text-dim)',marginBottom:4}}>Version History (newest first)</div>
+          {versions.length===0?(
+            <div style={{fontSize:10,color:'var(--text-dim)',textAlign:'center',padding:'8px'}}>No versions yet. Click "💾 Snapshot" to save one.</div>
+          ):(
+            versions.map(v=>(
+              <div key={v.id} style={{display:'flex',gap:8,alignItems:'center',padding:'4px 8px',background:'#12121a',borderRadius:4,marginBottom:4}}>
+                <div style={{flex:1,fontSize:9,color:'var(--text-dim)'}}>
+                  <div>{new Date(v.created_at).toLocaleString()}</div>
+                  <div style={{color:'var(--text-dim)',fontSize:8}}>{v.content_preview||'(empty)'}</div>
+                </div>
+                <button onClick={()=>restoreVersion(v.id)} disabled={savingVersion} style={{padding:'2px 6px',borderRadius:3,border:'none',background:'#166534',color:'#4ade80',fontSize:9,cursor:'pointer'}}>Restore</button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+      <style>{`@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}`}</style>
     </div>
   );
 }
@@ -142,6 +335,8 @@ export function FloatingPet(){
   const [speakEnabled,setSpeakEnabled]=useState(()=>load('speak',false));
   const [remoteUsers,setRemoteUsers]=useState([]);
   const [notionToken,setNotionToken]=useState(()=>load('notionToken',''));
+  const [notionClientId,setNotionClientId]=useState(()=>load('notionClientId',''));
+  const [notionClientSecret,setNotionClientSecret]=useState(()=>load('notionClientSecret',''));
   const [notionStatus,setNotionStatus]=useState('');
   const [syncingNotion,setSyncingNotion]=useState(false);
   const [obsidianVault,setObsidianVault]=useState(()=>load('obsidianVault',''));
@@ -151,6 +346,7 @@ export function FloatingPet(){
   const [customPets,setCustomPets]=useState(()=>load('customPets',[]));
   const [creatingPet,setCreatingPet]=useState(false);
   const [newPet,setNewPet]=useState({name:'',emoji:'',glow:'#6366f1',personality:'',desc:'Custom'});
+  const [theme,setTheme]=useState(()=>load('theme',{accent:'#6366f1',background:'#0a0a0f'}));
   const bcRef=useRef(null);
   const containerRef=useRef(null);
   const chatRef=useRef(null);
@@ -179,6 +375,14 @@ export function FloatingPet(){
   },[panelWidth]);
   useEffect(()=>{if(pos.x===null)updatePos(window.innerWidth-panelWidth-10,80)},[pos.x,updatePos,panelWidth]);
 
+  // Apply theme to CSS custom properties
+  useEffect(()=>{
+    const root=document.documentElement;
+    root.style.setProperty('--accent',theme.accent);
+    root.style.setProperty('--bg',theme.background);
+    root.style.setProperty('--theme-color',theme.accent);
+  },[theme]);
+
   // --- Brain API ---
   const loadBrain=useCallback(async()=>{
     try{const r=await fetch(`${API}/pet/brain`);setBrainDocs(await r.json())}catch(e){}
@@ -198,7 +402,7 @@ export function FloatingPet(){
     if(!notionToken){setNotionStatus('Error: No token');return}
     setSyncingNotion(true);setNotionStatus('Pushing...');
     try{
-      const r=await fetch(`${API}/notion/sync`,{method:'POST',headers:{'Content-Type':'application/json','x-user-id':userId},body:JSON.stringify({access_token:notionToken})});
+      const r=await fetch(`${API}/pet/notion/sync`,{method:'POST',headers:{'Content-Type':'application/json','x-user-id':userId},body:JSON.stringify({access_token:notionToken})});
       const d=await r.json();setNotionStatus(d.ok?`Pushed ${d.synced}/${d.total} docs`:`Error: ${d.error}`);
     }catch(e){setNotionStatus('Error: '+e.message)}
     finally{setSyncingNotion(false)}
@@ -209,13 +413,13 @@ export function FloatingPet(){
     setSyncingNotion(true);setNotionStatus('Pulling from Notion...');
     try{
       // Pull first
-      const pull=await fetch(`${API}/notion/sync-pull`,{method:'POST',headers:{'Content-Type':'application/json','x-user-id':userId},body:JSON.stringify({access_token:notionToken})});
+      const pull=await fetch(`${API}/pet/notion/sync-pull`,{method:'POST',headers:{'Content-Type':'application/json','x-user-id':userId},body:JSON.stringify({access_token:notionToken})});
       const pullData=await pull.json();
       if(!pullData.ok) throw new Error(pullData.error||'Pull failed');
       
       setNotionStatus(`Pulled ${pullData.pulled} docs, ${pullData.conflicts} conflicts`);
       // Then push
-      const push=await fetch(`${API}/notion/sync`,{method:'POST',headers:{'Content-Type':'application/json','x-user-id':userId},body:JSON.stringify({access_token:notionToken})});
+      const push=await fetch(`${API}/pet/notion/sync`,{method:'POST',headers:{'Content-Type':'application/json','x-user-id':userId},body:JSON.stringify({access_token:notionToken})});
       const pushData=await push.json();
       setNotionStatus(`↕ Sync complete: pulled ${pullData.pulled}, pushed ${pushData.synced}/${pushData.total}`);
     }catch(e){setNotionStatus('Error: '+e.message)}
@@ -225,6 +429,42 @@ export function FloatingPet(){
   const clearNotion=useCallback(()=>{
     setNotionToken('');save('notionToken','');setNotionStatus('');
   },[]);
+
+  // --- Notion OAuth ---
+  const configureNotionOAuth=useCallback(async()=>{
+    if(!notionClientId||!notionClientSecret){setNotionStatus('Error: Enter Client ID & Secret');return}
+    setNotionStatus('Saving OAuth config...');
+    try{
+      const r=await fetch(`${API}/pet/notion/oauth/configure`,{method:'POST',headers:{'Content-Type':'application/json','x-user-id':userId},body:JSON.stringify({client_id:notionClientId,client_secret:notionClientSecret})});
+      const d=await r.json();setNotionStatus(d.ok?'OAuth config saved':'Error: '+d.error);
+    }catch(e){setNotionStatus('Error: '+e.message)}
+  },[notionClientId,notionClientSecret,userId]);
+
+  const startNotionOAuth=useCallback(async()=>{
+    if(!notionClientId){setNotionStatus('Error: Configure OAuth first');return}
+    setSyncingNotion(true);setNotionStatus('Starting OAuth...');
+    try{
+      const r=await fetch(`${API}/pet/notion/oauth/authorize`,{method:'POST',headers:{'Content-Type':'application/json','x-user-id':userId},body:JSON.stringify({client_id:notionClientId})});
+      const d=await r.json();
+      if(d.url){
+        // Open popup for OAuth
+        const popup=window.open(d.url,'notion-oauth','width=500,height=600');
+        setNotionStatus('Waiting for authorization...');
+        // Listen for callback
+        window.addEventListener('message',async(e)=>{
+          if(e.data.type==='notion-oauth-callback'){
+            if(e.data.token){
+              setNotionToken(e.data.token);save('notionToken',e.data.token);
+              setNotionStatus('Connected! Token saved.');
+            }else if(e.data.error){
+              setNotionStatus('Error: '+e.data.error);
+            }
+            setSyncingNotion(false);
+          }
+        });
+      }else{setNotionStatus('Error: '+d.error);setSyncingNotion(false)}
+    }catch(e){setNotionStatus('Error: '+e.message);setSyncingNotion(false)}
+  },[notionClientId,userId]);
 
   const syncObsidian=useCallback(async()=>{
     if(!obsidianVault){setObsidianStatus('Error: No vault path');return}
@@ -759,7 +999,7 @@ export function FloatingPet(){
                         </div>
                       )}
                       {editingDoc?.id===d.id&&editingDoc?.field==='content'?(
-                        <CollabEditor docId={d.id} initialContent={editingDoc.val} onSave={async(content)=>{
+                        <CollabEditor docId={d.id} initialContent={editingDoc.val} userName={userName} onSave={async(content)=>{
                           await fetch(`${API}/pet/brain/${d.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({content})});
                           loadBrainDocs();setEditingDoc(null);
                         }} onCancel={()=>setEditingDoc(null)} />
@@ -814,19 +1054,47 @@ export function FloatingPet(){
                     </div>
                     {customPets.length>0&&<div style={{fontSize:10,color:'var(--text-dim)',marginTop:4}}>Custom pets: {customPets.map(p=>p.emoji+' '+p.name).join(', ')}</div>}
                   </div>
+
+                  {/* Theme picker */}
+                  <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)'}}>
+                    <div style={{fontWeight:600,color:'var(--text)',fontSize:11,marginBottom:4}}>🎨 Theme</div>
+                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                      <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                        <span style={{fontSize:10,color:'var(--text-dim)',width:50}}>Accent</span>
+                        <input type="color" value={theme.accent} onChange={e=>{const t={...theme,accent:e.target.value};setTheme(t);save('theme',t)}} style={{width:40,height:28,border:'none',borderRadius:4,cursor:'pointer',background:'transparent'}}/>
+                        <input type="text" value={theme.accent} onChange={e=>{const t={...theme,accent:e.target.value};setTheme(t);save('theme',t)}} style={{flex:1,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',background:'#12121a',color:'var(--text)',outline:'none',fontSize:11,textTransform:'uppercase'}}/>
+                      </div>
+                      <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                        <span style={{fontSize:10,color:'var(--text-dim)',width:50}}>Background</span>
+                        <input type="color" value={theme.background} onChange={e=>{const t={...theme,background:e.target.value};setTheme(t);save('theme',t)}} style={{width:40,height:28,border:'none',borderRadius:4,cursor:'pointer',background:'transparent'}}/>
+                        <input type="text" value={theme.background} onChange={e=>{const t={...theme,background:e.target.value};setTheme(t);save('theme',t)}} style={{flex:1,padding:'4px 8px',borderRadius:4,border:'1px solid var(--border)',background:'#12121a',color:'var(--text)',outline:'none',fontSize:11,textTransform:'uppercase'}}/>
+                      </div>
+                      <div style={{display:'flex',gap:4}}>
+                        <button onClick={()=>{const t={accent:'#6366f1',background:'#0a0a0f'};setTheme(t);save('theme',t)}} style={{flex:1,padding:'4px 8px',borderRadius:4,border:'none',background:'var(--accent)',color:'#fff',fontSize:10,cursor:'pointer'}}>Default</button>
+                        <button onClick={()=>{const t={accent:'#22c55e',background:'#0a0a0f'};setTheme(t);save('theme',t)}} style={{flex:1,padding:'4px 8px',borderRadius:4,border:'none',background:'#22c55e',color:'#fff',fontSize:10,cursor:'pointer'}}>Green</button>
+                        <button onClick={()=>{const t={accent:'#f97316',background:'#0a0a0f'};setTheme(t);save('theme',t)}} style={{flex:1,padding:'4px 8px',borderRadius:4,border:'none',background:'#f97316',color:'#fff',fontSize:10,cursor:'pointer'}}>Orange</button>
+                        <button onClick={()=>{const t={accent:'#a855f7',background:'#0a0a0f'};setTheme(t);save('theme',t)}} style={{flex:1,padding:'4px 8px',borderRadius:4,border:'none',background:'#a855f7',color:'#fff',fontSize:10,cursor:'pointer'}}>Purple</button>
+                      </div>
+                    </div>
+</div>
+
+                  {/* Integrations */}
                   <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border)'}}>
                     <div style={{fontWeight:600,color:'var(--text)',fontSize:11,marginBottom:4}}>🔗 Integrations</div>
-                    
-                    {/* Notion */}
-                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                      <label style={{fontSize:10,color:'var(--text-dim)'}}>Notion Integration Token</label>
-                      <div style={{display:'flex',gap:4}}>
-                        <input type="password" value={notionToken} onChange={e=>{const v=e.target.value;setNotionToken(v);save('notionToken',v)}} placeholder="secret_xxx" style={{flex:1,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'#12121a',color:'var(--text)',outline:'none',fontSize:11}}/>
-                        <button onClick={syncNotion} disabled={syncingNotion} style={{...btnS,fontSize:10,padding:'4px 8px'}}>{syncingNotion?'⏳':'↻ Push'}</button>
-                        <button onClick={syncNotionBidi} disabled={syncingNotion} style={{...btnS,fontSize:10,padding:'4px 8px'}}>{syncingNotion?'⏳':'↕ Sync'}</button>
-                        <button onClick={clearNotion} style={{...btnS,fontSize:10,padding:'4px 8px',background:'#2a2a3a'}}>✕</button>
+                      <label style={{fontSize:10,color:'var(--text-dim)'}}>Notion OAuth</label>
+                      <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                        <div style={{display:'flex',gap:4}}>
+                          <input value={notionClientId} onChange={e=>{const v=e.target.value;setNotionClientId(v);save('notionClientId',v)}} placeholder="Client ID" style={{flex:1,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'#12121a',color:'var(--text)',outline:'none',fontSize:11}}/>
+                          <input type="password" value={notionClientSecret} onChange={e=>{const v=e.target.value;setNotionClientSecret(v);save('notionClientSecret',v)}} placeholder="Client Secret" style={{flex:1,padding:'6px 8px',borderRadius:6,border:'1px solid var(--border)',background:'#12121a',color:'var(--text)',outline:'none',fontSize:11}}/>
+                          <button onClick={configureNotionOAuth} disabled={!notionClientId||!notionClientSecret} style={{...btnS,fontSize:10,padding:'4px 8px'}}>Save Config</button>
+                        </div>
+                        <div style={{display:'flex',gap:4}}>
+                          <button onClick={startNotionOAuth} disabled={!notionClientId||syncingNotion} style={{...btnS,fontSize:10,padding:'4px 8px',flex:1}}>{syncingNotion?'⏳':'🔐 Connect'}</button>
+                          <button onClick={syncNotionBidi} disabled={!notionToken||syncingNotion} style={{...btnS,fontSize:10,padding:'4px 8px'}}>{syncingNotion?'⏳':'↕ Sync'}</button>
+                          <button onClick={clearNotion} style={{...btnS,fontSize:10,padding:'4px 8px',background:'#2a2a3a'}}>✕</button>
+                        </div>
+                        {notionStatus&&<div style={{fontSize:10,color:notionStatus.includes('Error')?'#f97316':'#22c55e'}}>{notionStatus}</div>}
                       </div>
-                      {notionStatus&&<div style={{fontSize:10,color:notionStatus.startsWith('Error')?'#f97316':'#22c55e'}}>{notionStatus}</div>}
                     </div>
 
                     {/* Obsidian */}
@@ -837,7 +1105,7 @@ export function FloatingPet(){
                         <button onClick={syncObsidian} disabled={syncingObsidian} style={{...btnS,fontSize:10,padding:'4px 8px'}}>{syncingObsidian?'⏳':'📁 Sync'}</button>
                         <button onClick={clearObsidian} style={{...btnS,fontSize:10,padding:'4px 8px',background:'#2a2a3a'}}>✕</button>
                       </div>
-                      {obsidianStatus&&<div style={{fontSize:10,color:obsidianStatus.startsWith('Error')?'#f97316':'#22c55e'}}>{obsidianStatus}</div>}
+                      {obsidianStatus&&<div style={{fontSize:10,color:obsidianStatus.includes('Error')?'#f97316':'#22c55e'}}>{obsidianStatus}</div>}
                     </div>
                   </div>
 
@@ -857,10 +1125,9 @@ export function FloatingPet(){
                         </div>
                       </div>
                     )}
-                  </div>
+</div>
                 </div>
-              </div>
-            )}
+              )}
 
             {/* reminders panel */}
             {showReminders&&!showBrain&&!showSettings&&(
