@@ -335,8 +335,6 @@ function startPolling() {
 // --- Start ---
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', async () => {
-  console.log(`AI Rate Gauge server running on http://0.0.0.0:${PORT}`);
-  await workerNode.start();
-  taskQueue.startPolling();
+  console.log(`friendlyfriends server running on http://0.0.0.0:${PORT}`);
   startPolling();
 });
