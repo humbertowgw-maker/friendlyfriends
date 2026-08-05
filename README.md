@@ -7,7 +7,7 @@ A self-hosted Node/React app that does two very different jobs in one codebase:
 
 Bolted on top of both is "Sophia," a floating desktop-pet chat assistant with real-time multi-user sync.
 
-The `package.json` name (`ai-rate-gauge`) reflects where the project started, not what it grew into — it's the oldest evidence in the repo of the app's original scope before the episode pipeline and Sophia were layered in.
+The `package.json` name was `ai-rate-gauge` until it was renamed to `friendlyfriends` — that old slug is the oldest evidence in the repo of the app's original scope before the episode pipeline and Sophia were layered in. One leftover remains: `server/db/database.js` still points at `data/rate-gauge.db` — left as-is since the file is gitignored and renaming it would orphan any existing data on a running deployment rather than migrate it.
 
 ## Stack
 
@@ -37,4 +37,4 @@ The `package.json` name (`ai-rate-gauge`) reflects where the project started, no
 - No automated test suite or CI. `test-pipeline.mjs` / `test-episode-build.mjs` are manual integration scripts run by hand, not wired into anything that runs on push.
 - No GitHub Actions workflow currently exists — it was tried and removed (see above). How/whether this actually redeploys today isn't documented in-repo.
 - The `fleet/` distributed-worker feature was scoped, referenced in `server/index.js`, and then cut before its source files were ever committed — evidence of a feature that didn't make it past the idea stage in this codebase.
-- `package.json`'s name/description no longer match the app's actual scope (episode pipeline + Sophia dwarf the original rate-gauge dashboard by commit volume).
+- `package.json`'s name/description have been updated to `friendlyfriends`, but the SQLite data file is still named `rate-gauge.db` internally (see above) — a deliberate non-fix pending a real data migration plan.

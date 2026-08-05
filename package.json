@@ -1,9 +1,9 @@
 {
-  "name": "ai-rate-gauge",
+  "name": "friendlyfriends",
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Self-aware AI rate gauge dashboard - tracks costs, rate limits, and optimizes model usage",
+  "description": "Zero-budget animated pet-episode pipeline (Pollinations image gen, Edge TTS, FFmpeg) plus an AI provider cost/rate-limit dashboard and the Sophia CRDT-synced chat pet",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run yjs\" \"npm run client\"",
     "server": "node server/index.js",
