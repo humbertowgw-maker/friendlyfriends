@@ -1,5 +1,7 @@
 # friendlyfriends
 
+> **Project status:** First public version. This is an early-stage project and should be treated as a development preview, not a finished production product.
+
 A self-hosted Node/React app that does two very different jobs in one codebase:
 
 1. **AI provider cost & rate-limit dashboard** — tracks usage across OpenAI, Anthropic, Gemini, OpenRouter, and local models (Ollama/LM Studio), scores which model to route a task to based on real usage history, predicts spend, and fires alerts.
