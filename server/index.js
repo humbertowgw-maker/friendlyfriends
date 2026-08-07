@@ -18,6 +18,7 @@ import { fileURLToPath } from 'url';
 import { ObsidianWatcher } from './obsidian-watcher.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const clientDist = join(__dirname, '..', 'client', 'dist');
 
 const app = express();
 const server = createServer(app);
@@ -315,6 +316,13 @@ app.get('/api/dashboard', (req, res) => {
     predictions: predictor.predict(),
     suggestions: optimizer.getSuggestions(),
   });
+});
+
+// Serve the production client from the same origin as the API. Keeping this
+// after every API route preserves JSON 404s while still supporting SPA routes.
+app.use(express.static(clientDist));
+app.get('*', (req, res) => {
+  res.sendFile(join(clientDist, 'index.html'));
 });
 
 // --- Periodic polling for rate limits ---

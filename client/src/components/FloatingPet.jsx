@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 
-const YJS_URL = 'ws://localhost:1234';
+const YJS_URL = import.meta.env.VITE_YJS_URL || 'ws://localhost:1234';
 
 function CollabEditor({docId, initialContent, userName, onSave, onCancel}){
   const textareaRef=useRef(null);
