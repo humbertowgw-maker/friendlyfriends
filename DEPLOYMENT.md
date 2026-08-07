@@ -27,10 +27,10 @@ A GitHub Actions workflow that ran `railway up --ci` on every push to
 `master` was added, patched, and then deleted, all within a few commits of
 each other:
 
-- `4622161` — added `.github/workflows/railway-deploy.yml`, running
+- `5ad96d0` — added `.github/workflows/railway-deploy.yml`, running
   `railway up --ci` with `RAILWAY_TOKEN` from a repo secret.
-- `95fa38c` — fixed how `RAILWAY_TOKEN` was passed to the CLI.
-- `7c1ce42` — deleted the workflow file entirely.
+- `699b190` — fixed how `RAILWAY_TOKEN` was passed to the CLI.
+- `c35061e` — deleted the workflow file entirely.
 
 Net effect: **no GitHub Actions deploy workflow exists in this repo today.**
 Whatever caused it to be removed (rather than just fixed further) isn't
@@ -59,7 +59,7 @@ Using the GitHub API against this repo (`gh api repos/humbertowgw-maker/friendly
 
 - `/hooks` returns `[]` — no classic repo webhooks are registered.
 - `/commits/<sha>/status` and `/commits/<sha>/check-runs` on the latest
-  commits (including today's `2d4a542` crash fix) return zero statuses and
+  commits (including today's `54cff34` crash fix) return zero statuses and
   zero check runs — nothing is currently posting deploy status back to
   GitHub for these commits.
 - `/deployments` (GitHub's Deployments API) returns `[]`.
@@ -78,7 +78,7 @@ investigation did not have access to:
 
 - Whether the `web` and `yjs` services are actually connected to this GitHub
   repo, and if so, whether auto-deploy on push is enabled.
-- Whether today's crash fix (`2d4a542`, removing the dead
+- Whether today's crash fix (`54cff34`, removing the dead
   `workerNode`/`taskQueue` boot calls) has actually been deployed, or is
   still sitting on `master` waiting for a manual deploy trigger.
 - The live URL(s) for either service, and their current health/uptime.
