@@ -14,7 +14,7 @@ source (`.`):
   starts with `npm run server` (i.e. `node server/index.js`), health-checked
   at `/api/health`, restarts on failure (max 3 retries).
 - **`yjs`** — same source, starts with `node server/yjs-server.js`
-  (the standalone Yjs CRDT WebSocket server for Sophia's multi-device sync),
+  (the standalone Yjs CRDT WebSocket server for Maria's multi-device sync),
   health-checked at `/health`.
 
 That's the entire deploy configuration present in the repo. There is no

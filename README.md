@@ -7,9 +7,9 @@ A self-hosted Node/React app that does two very different jobs in one codebase:
 1. **AI provider cost & rate-limit dashboard** — tracks usage across OpenAI, Anthropic, Gemini, OpenRouter, and local models (Ollama/LM Studio), scores which model to route a task to based on real usage history, predicts spend, and fires alerts.
 2. **A zero-budget animated-episode pipeline** for a real cast of pets — Achilles (blind service dog), Athena (his diabetic sister), Henry (deaf white cat), Falcor (cross-eyed white cat), Peter (parakeet), and Walter (his lovebird cage-mate) — turning short scripts into character art, TTS dialogue, and assembled MP4 episodes using only free tools (Pollinations.ai, Edge TTS, FFmpeg).
 
-Bolted on top of both is "Sophia," a floating desktop-pet chat assistant with real-time multi-user sync.
+Bolted on top of both is "Maria," a floating desktop-pet chat assistant with real-time multi-user sync.
 
-The `package.json` name was `ai-rate-gauge` until it was renamed to `friendlyfriends` — that old slug is the oldest evidence in the repo of the app's original scope before the episode pipeline and Sophia were layered in. One leftover remains: `server/db/database.js` still points at `data/rate-gauge.db` — left as-is since the file is gitignored and renaming it would orphan any existing data on a running deployment rather than migrate it.
+The `package.json` name was `ai-rate-gauge` until it was renamed to `friendlyfriends` — that old slug is the oldest evidence in the repo of the app's original scope before the episode pipeline and Maria were layered in. One leftover remains: `server/db/database.js` still points at `data/rate-gauge.db` — left as-is since the file is gitignored and renaming it would orphan any existing data on a running deployment rather than migrate it.
 
 ## Stack
 
@@ -44,7 +44,7 @@ The `package.json` name was `ai-rate-gauge` until it was renamed to `friendlyfri
 - Character/episode pipeline (image → TTS → Ken Burns video → concatenated MP4), validated by committed integration test runs.
 - Inventory system (characters, poses, expressions, batch generation, gap tracking) with a real SQLite schema behind it.
 - Cost/rate dashboard components (RateGauge, CostChart, SmartRouter, Predictions, AlertPanel) reading from real usage-event queries, not mock data.
-- Sophia: floating chat pet with persistent history, Yjs CRDT multi-device sync, Notion OAuth + bidirectional sync, Obsidian file-watching, PWA/offline support — a large amount of surface area (`FloatingPet.jsx` alone is ~1,350 lines) added across two dense commits (`4624396`, `7f3574e`).
+- Maria: floating chat pet with persistent history, Yjs CRDT multi-device sync, Notion OAuth + bidirectional sync, Obsidian file-watching, PWA/offline support — a large amount of surface area (`FloatingPet.jsx` alone is ~1,350 lines) added across two dense commits (`4624396`, `7f3574e`).
 - A Vitest unit suite covering the generator fallback chain, inventory-first resolution, and SmartRouter scoring (see "Testing" above).
 
 **Gaps, stated plainly:**

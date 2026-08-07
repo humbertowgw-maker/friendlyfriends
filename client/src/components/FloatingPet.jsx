@@ -863,7 +863,7 @@ export function FloatingPet(){
           flexDirection:'column',gap:16,
         }}>
           <div style={{fontSize:48}}>🧠</div>
-          <div style={{fontSize:18,fontWeight:600,color:'var(--text)'}}>Drop into Sophia's Brain</div>
+          <div style={{fontSize:18,fontWeight:600,color:'var(--text)'}}>Drop into Maria's Brain</div>
           <div style={{fontSize:13,color:'var(--text-dim)'}}>Files, text, code — anything you want remembered</div>
         </div>
       )}
@@ -895,7 +895,7 @@ export function FloatingPet(){
                   boxShadow:`0 0 12px ${pet.glow}55`,transition:'all 0.3s',
                 }}>{pet.emoji}</div>
                 <div>
-                  <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{pet.name} <span style={{fontWeight:400,color:'var(--text-dim)',fontSize:11}}>as Sophia</span></div>
+                  <div style={{fontSize:13,fontWeight:600,color:'var(--text)'}}>{pet.name} <span style={{fontWeight:400,color:'var(--text-dim)',fontSize:11}}>as Maria</span></div>
                   <div style={{fontSize:10,color:pet.glow}}>{moodData.label}</div>
                 </div>
               </div>

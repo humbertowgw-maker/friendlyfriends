@@ -1,6 +1,6 @@
 {
-  "name": "Sophia - Second Brain",
-  "short_name": "Sophia",
+  "name": "Maria - Second Brain",
+  "short_name": "Maria",
   "description": "Your autonomous AI companion and second brain",
   "start_url": "/",
   "display": "standalone",
@@ -21,7 +21,7 @@
     {
       "name": "Chat",
       "short_name": "Chat",
-      "description": "Open chat with Sophia",
+      "description": "Open chat with Maria",
       "url": "/?tab=chat",
       "icons": [{ "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>" }]
     },

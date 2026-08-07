@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Zero-budget animated pet-episode pipeline (Pollinations image gen, Edge TTS, FFmpeg) plus an AI provider cost/rate-limit dashboard and the Sophia CRDT-synced chat pet",
+  "description": "Zero-budget animated pet-episode pipeline (Pollinations image gen, Edge TTS, FFmpeg) plus an AI provider cost/rate-limit dashboard and the Maria CRDT-synced chat pet",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run yjs\" \"npm run client\"",
     "server": "node server/index.js",

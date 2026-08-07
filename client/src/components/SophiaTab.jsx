@@ -152,7 +152,7 @@ export function SophiaTab() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 22 }}>🧠</span>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 600 }}>Sophia</div>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>Maria</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>WGW Second Brain · {stats.requests} today</div>
             </div>
           </div>
@@ -172,7 +172,7 @@ export function SophiaTab() {
           {messages.length === 0 && !thinking && (
             <div style={{ textAlign: 'center', color: 'var(--text-dim)', fontSize: 14, padding: '60px 20px', lineHeight: 1.8 }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🧠</div>
-              <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>Hey, I'm Sophia</div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>Hey, I'm Maria</div>
               <div style={{ marginTop: 6 }}>Your second brain, ready anytime.</div>
               <div style={{ marginTop: 20, display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
                 {['What do you know?', 'Help me plan my day', 'Search my brain', 'Set a reminder'].map((q, i) => (
@@ -214,7 +214,7 @@ export function SophiaTab() {
         <div style={{ display: 'flex', gap: 8, padding: '12px 16px 14px', borderTop: '1px solid var(--border)', background: '#0a0a0f' }}>
           <input ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder="Ask Sophia anything..." disabled={thinking}
+            placeholder="Ask Maria anything..." disabled={thinking}
             style={{
               flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)',
               background: '#12121a', color: 'var(--text)', fontSize: 14, outline: 'none',
@@ -321,7 +321,7 @@ export function SophiaTab() {
                   <span onClick={() => deleteReminder(r.id)} style={{ cursor: 'pointer', fontSize: 12, color: 'var(--text-dim)', opacity: 0.5 }}>✕</span>
                 </div>
               ))}
-              {reminders.length === 0 && dueReminders.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>No reminders. Create one to have Sophia nudge you.</div>}
+              {reminders.length === 0 && dueReminders.length === 0 && <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12 }}>No reminders. Create one to have Maria nudge you.</div>}
             </div>
           </div>
         )}
