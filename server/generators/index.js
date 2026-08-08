@@ -110,8 +110,8 @@ export function createGenerators() {
 
   // Priority order: local SD first (free, fast), then Pollinations (free, no key), then HuggingFace (free tier)
   manager.register(new LocalSDAdapter({ priority: 10 }));
-  manager.register(new PollinationsAdapter({ priority: 50 }));
-  manager.register(new HuggingFaceAdapter({ priority: 40 }));
+  manager.register(new PollinationsAdapter({ priority: 30 }));
+  manager.register(new HuggingFaceAdapter({ priority: 50 }));
 
   return manager;
 }
