@@ -321,7 +321,7 @@ app.get('/api/dashboard', (req, res) => {
 // Serve the production client from the same origin as the API. Keeping this
 // after every API route preserves JSON 404s while still supporting SPA routes.
 app.use(express.static(clientDist));
-app.get('*', (req, res) => {
+app.get('/{*splat}', (req, res) => {
   res.sendFile(join(clientDist, 'index.html'));
 });
 
