@@ -27,7 +27,7 @@
     "y-websocket": "^2.1.0"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2",
+    "concurrently": "^10.0.4",
     "vitest": "^4.1.10"
   }
 }
