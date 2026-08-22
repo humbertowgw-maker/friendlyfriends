@@ -23,11 +23,11 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "gray-matter": "^4.0.3",
-    "sql.js": "^1.12.0",
+    "sql.js": "^1.14.2",
     "y-websocket": "^3.1.0"
   },
   "devDependencies": {
-    "concurrently": "^10.0.4",
-    "vitest": "^4.1.10"
+    "concurrently": "^10.0.5",
+    "vitest": "^4.1.11"
   }
 }
