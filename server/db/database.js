@@ -4,7 +4,7 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DB_PATH = join(__dirname, '..', 'data', 'rate-gauge.db');
+const DB_PATH = join(__dirname, '..', 'data', 'friendlyfriends.db');
 
 let db;
 let SQL;
