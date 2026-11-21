@@ -11,7 +11,7 @@
   "dependencies": {
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "recharts": "^3.10.1",
+    "recharts": "^3.11.0",
     "y-websocket": "^3.0.0",
     "yjs": "^13.6.33"
   },
